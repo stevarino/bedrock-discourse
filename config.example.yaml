@@ -1,0 +1,63 @@
+# minecraft defines the minecraft agent connections and behavior
+minecraft:
+  # optional timeout time in ms
+  connectTimeout: 10000
+  # optional profile directory (see bedrock-protocol docs)
+  profilesFolder: "C:\\projects\\pocket_prattle\\profiles"
+  servvers:
+    # under minecraft.servers, define servers using short names
+    survival:
+      # connection details, required
+      host: my-server.com
+      port: 19132
+      # optional commands for the bot to take upon joining
+      actions:
+        - /say Hello World
+      # relay defines minecraft <-> discord chat relays (optional)
+      relay:
+        # default settings are designated with {}
+        my_discord_channel: {}
+        my_logging_discord:
+          # only send messages to discord, never receive
+          sendOnly: true
+          # send messages from the bot itself to discord
+          sendOwnMessages: true
+          # send non-chat messages (join/leave/etc)
+          sendNotices: true
+    creative:
+      host: my-server.com
+      port: 19134
+      relay:
+        my_other_discord_channel: {}
+        # multiple minecraft servers can point to the same channel
+        my_logging_discord:
+          sendOnly: true
+          sendOwnMessages: true
+          sendNotices: true
+web:
+  # prometheus client web server details - an http endpoint for server stats
+  host: localhost
+  port: 3333
+discord:
+  # discord app details.
+  # https://discordpy.readthedocs.io/en/stable/discord.html
+  # Only "create hooks" permission is recommended at this time (but unused).
+  token: 'discord.bot.token.12345'
+  app_id: 'discord.bot.app.id'
+  # a bots nickname can be set globally ...
+  nick: 'General Discord Nickname'
+  channels:
+    my_discord_channel:
+      guild: '12345'
+      channel: '67890'
+      # ... or in the channel config (set at the guild/server level though)
+      nick: 'Specific Discord Name'
+    my_other_discord_channel:
+      # NOTE: guild and channel must be strings (blame ieee 754)
+      guild: '12345'
+      channel: '67891'
+    my_logging_discord:
+      guild: '54321'
+      channel: '09876'
+      # allows specific formatting options
+      format: '[{sender} ({senderid}): {type}] {content} ({parameters})'

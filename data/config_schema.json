@@ -1,0 +1,85 @@
+{
+    "type": "object",
+    "properties": {
+        "minecraft": {
+            "type": "object",
+            "properties": {
+                "profilesFolder": { "type": "string" },
+                "connectTimeout": { "type": "number" },
+                "servers": {
+                    "type": "object",
+                    "patternProperties": {
+                        "": {
+                            "type": "object",
+                            "properties": {
+                                "host": { "type": "string" },
+                                "port": { "type": "number" },
+                                "format": { "type": "string" },
+                                "actions": {
+                                    "type": "array",
+                                    "items": { "type": "string" }
+                                },
+                                "relay": {
+                                    "type": "object",
+                                    "patternProperties": {
+                                        "": {
+                                            "type": "object",
+                                            "properties": {
+                                                "sendOnly": { "type": "bool" },
+                                                "receiveOnly": { "type": "bool" },
+                                                "sendOwnMessages": { "type": "bool" },
+                                                "sendNotices": { "type": "bool" }
+                                            },
+                                            "additionalProperties": false
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [ "host", "port" ],
+                            "additionalProperties": false
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false,
+            "required": [ "servers" ]
+        },
+        "web": {
+            "type": "object",
+            "properties": {
+                "host": { "type": "string" },
+                "port": { "type": "number" }
+            },
+            "required": [ "host", "port" ],
+            "additionalProperties": false
+        },
+        "discord": {
+            "type": "object",
+            "properties": {
+                "token": { "type": "string" },
+                "app_id": { "type": "string" },
+                "channels": {
+                    "type": "object",
+                    "patternProperties": {
+                        "": {
+                            "type": "object",
+                            "properties": {
+                                "guild": { "type": "string" },
+                                "channel": { "type": "string" },
+                                "nick": { "type": "string" },
+                                "format": { "type": "string" }
+                            },
+                            "required": [ "guild", "channel" ],
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "nick": { "type": "string" }
+            },
+            "required": [ "token", "app_id", "channels" ],
+            "additionalProperties": false
+        }
+    },
+    "required": [ "minecraft" ],
+    "additionalProperties": false
+}
