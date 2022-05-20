@@ -8,6 +8,7 @@ const prom = require('./prom');
 const agents = [];
 let watchdogTimer;
 
+// loggable deaths that have a definite cause, but no other actors
 const deaths = [
   'death.attack.anvil', 'death.attack.cactus', 'death.attack.drown',
   'death.attack.explosion', 'death.attack.fall', 'death.attack.fallingBlock',
@@ -18,6 +19,7 @@ const deaths = [
   'death.attack.starve', 'death.attack.wither', 'death.fell.killer',
 ];
 
+// group falls together
 const falls = [
   'death.fell.accident.generic', 'death.fell.accident.ladder',
   'death.fell.accident.vines', 'death.fell.accident.water',
@@ -28,7 +30,7 @@ class Agent {
    * A Minecraft agent, relaying chat messages and obsserving state for a
    * particular server. Not a bot, not really a client itself, its an agent!
    * @param {string} name
-   * @param {{ host: string, port: number, relay: object?, forward: object?, actions: array<string>? }} options
+   * @param {{ host: string, port: number, relay: object?, actions: array<string>? format: string? }} options
    */
   constructor(name, options) {
     this.name = name;
