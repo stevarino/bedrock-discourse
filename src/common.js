@@ -34,6 +34,10 @@ function log(source, ...args) {
   console.log(`${ts} [${source.padEnd(LOG_SOURCE_LENGTH)}]`, ...args);
 }
 
+['SIGINT', 'SIGTERM'].forEach((signal) => {
+  process.on(signal, () => messenger.emit('stop'));
+});
+
 module.exports = {
   format, messenger, log,
 };

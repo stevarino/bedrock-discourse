@@ -39,7 +39,7 @@ function init() {
     });
   });
 
-  process.on('SIGINT', () => {
+  common.messenger.on('stop', () => {
     server.close(() => { log('Server is closed'); });
     Object.values(sockets).forEach(s => { s.destroy(); });
   });

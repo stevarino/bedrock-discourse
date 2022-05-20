@@ -32,8 +32,8 @@ function init() {
     }
   });
 
-  process.on('SIGINT', () => {
-    log('received sigterm; disconnecting.');
+  common.messenger.on('stop', () => {
+    log('received stop; disconnecting.');
     client.destroy();
   });
 

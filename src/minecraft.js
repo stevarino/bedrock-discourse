@@ -416,19 +416,16 @@ function log(...args) {
 /**
  * Stop all Agents.
  */
-function stop() {
-  log('stop!');
+common.messenger.on('stop', () => {
+  log('stopping');
   agents.forEach(agent => agent.stop());
   clearInterval(watchdogTimer);
-}
+});
 
 Object.assign(module.exports, {
-  init, stop,
+  init,
 });
 
 if (require.main === module) {
-  process.on('SIGINT', () => {
-    stop();
-  });
   init();
 }
