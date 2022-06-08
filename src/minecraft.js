@@ -59,14 +59,14 @@ class Agent {
       port: this.port,
       conLog: (...args) => log(`${this.name}: `, ...args),
     };
-    if (this?.options) {
-      Object.assign(options, this.options);
-    }
     if (config.minecraft.profilesFolder !== undefined) {
       options['profilesFolder'] = config.minecraft.profilesFolder;
     }
     if (config.minecraft.connectTimeout !== undefined) {
       options['connectTimeout'] = config.minecraft.connectTimeout;
+    }
+    if (this?.options) {
+      Object.assign(options, this.options);
     }
     this.client = bedrock.createClient(options);
     if (this?.options?.protocolVersion) {
