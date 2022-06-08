@@ -15,7 +15,7 @@
     "prometheus"
   ],
   "author": "Stephen O'Connor",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@discordjs/rest": "^0.4.1",
     "bedrock-protocol": "^3.13.0",
