@@ -68,7 +68,7 @@ function init() {
   });
 
   client.on('messageCreate', async message => {
-    if (message.author.bot) {
+    if (message.author.bot || channelsById[message.channelId] === undefined) {
       return;
     }
     const author = await message.guild.members.fetch(message.author);

@@ -19,6 +19,7 @@
                                     "type": "array",
                                     "items": { "type": "string" }
                                 },
+                                "options": {"type": "object"},
                                 "relay": {
                                     "type": "object",
                                     "patternProperties": {

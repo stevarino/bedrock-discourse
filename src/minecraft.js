@@ -41,7 +41,6 @@ class Agent {
     this.actions = [];
     this.relay = {};
     this.active = true;
-    this.uuid = '';
     Object.assign(this, options);
 
     common.messenger.on('minecraft', (channel, message) => this.relayMessage(channel, message));
@@ -54,14 +53,15 @@ class Agent {
   createClient() {
     if (this.client !== undefined) {
       this.client.close();
-      clearInterval(this.client.loop);
     }
     const options = {
       host: this.host,
       port: this.port,
-      skipPing: true,
       conLog: (...args) => log(`${this.name}: `, ...args),
     };
+    if (this?.options) {
+      Object.assign(options, this.options);
+    }
     if (config.minecraft.profilesFolder !== undefined) {
       options['profilesFolder'] = config.minecraft.profilesFolder;
     }
@@ -69,13 +69,25 @@ class Agent {
       options['connectTimeout'] = config.minecraft.connectTimeout;
     }
     this.client = bedrock.createClient(options);
+    if (this?.options?.protocolVersion) {
+      this.client.options.protocolVersion = this.options.protocolVersion;
+    }
 
     [
       'player_list', 'set_time', 'level_event', 'heartbeat', 'text',
-      'start_game', 'close', 'disconnect', 'error', 'spawn',
+      'start_game', 'close', 'disconnect', 'error', 'spawn', 'ping_timeout',
+      'session',
     ].forEach(event => {
       this.client.on(event, packet => this[event](packet));
     });
+  }
+
+  ping_timeout() {
+    log('ping_timeout');
+  }
+
+  session() {
+    log('authenticated');
   }
 
   /**
