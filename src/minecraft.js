@@ -41,6 +41,9 @@ class Agent {
     this.actions = [];
     this.relay = {};
     this.active = true;
+    this.authenticated = null;
+    this.authResolve = null;
+    this.authReject = null;
     Object.assign(this, options);
 
     common.messenger.on('minecraft', (channel, message) => this.relayMessage(channel, message));
@@ -51,13 +54,17 @@ class Agent {
    * Creates the client as needed.
    */
   createClient() {
+    this.authenticated = new Promise((resolve, reject) => {
+      this.authResolve = resolve;
+      this.authReject = reject;
+    });
     if (this.client !== undefined) {
       this.client.close();
     }
     const options = {
       host: this.host,
       port: this.port,
-      conLog: (...args) => log(`${this.name}: `, ...args),
+      conLog: (...args) => log(`${this.name} [conlog]: `, ...args),
     };
     if (config.minecraft.profilesFolder !== undefined) {
       options['profilesFolder'] = config.minecraft.profilesFolder;
@@ -88,6 +95,11 @@ class Agent {
 
   session() {
     log('authenticated');
+    this.authResolve();
+  }
+
+  async onReady() {
+    await this.authenticated;
   }
 
   /**
@@ -95,7 +107,8 @@ class Agent {
    * @param  {...any} args
    */
   error(...args) {
-    log(this.name, ...args);
+    log(`${this.name} [error]: `, ...args);
+    this.authReject(...args);
   }
 
   /**
@@ -296,7 +309,7 @@ class Agent {
    */
   close() {
     log(`${this.name} close`);
-    if (this.active) {
+    if (this.active && this.reconnectTimer === null) {
       this.reconnectTimer = setTimeout(() => this.reconnect(10), 500);
     }
   }
@@ -305,8 +318,8 @@ class Agent {
    * Try to reconnect with exponential backoff.
    */
   reconnect(timeout) {
-    if (this.client.status == ClientStatus.Initialized) {
-      this.reconnectTimer = null;
+    this.reconnectTimer = null;
+    if (!this.active || this.client.status == ClientStatus.Initialized) {
       return;
     }
     timeout = Math.min(timeout * 1.5, 300);
@@ -322,6 +335,7 @@ class Agent {
    */
   stop() {
     log(`${this.name} stop`);
+    this.active = false;
     this.client.disconnect();
     this.client.close();
     if (this.reconnectTimer !== null) {
@@ -336,8 +350,7 @@ class Agent {
    */
   disconnect() {
     log(`${this.name} disconnected`);
-    console.log(`disconnect ${this.name}`);
-    if (this.active) {
+    if (this.active && this.reconnectTimer === null) {
       this.reconnectTimer = setTimeout(() => this.reconnect(10), 500);
     }
   }
@@ -390,17 +403,24 @@ class Agent {
 /**
  * Start watchdog and initialize Agent objects.
  */
-function init() {
+async function init() {
   let ms = 10000;
   if (config.minecraft.connectTimeout !== undefined) {
     ms = Math.max(ms, config.minecraft.connectTimeout * 1.5);
   }
   watchdogTimer = setInterval(watchdog, ms);
 
-  Object.entries(config.minecraft.servers).forEach(([name, options]) => {
+  for (const name in config.minecraft.servers) {
     log(`Starting ${name}`);
-    agents.push(new Agent(name, options));
-  });
+    const agent = new Agent(name, config.minecraft.servers[name]);
+    agents.push(agent);
+    try {
+      await agent.onReady();
+    }
+    catch (e) {
+      console.error(e);
+    }
+  }
 }
 
 /**
