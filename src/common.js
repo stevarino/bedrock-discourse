@@ -3,6 +3,40 @@ const EventEmitter = require('events').EventEmitter;
 const commonFormat = '[{sender}@{source}]: {content}';
 const messenger = new EventEmitter();
 
+const MessageType = {
+  MinecraftWhisper: 'MinecraftWhisper',
+  MinecraftChat: 'MinecraftChat',
+  MinecraftRelay: 'MinecraftRelay',
+  DiscordDM: 'DiscordDM',
+  DiscordChat: 'DiscordChat',
+  DiscordRelay: 'DiscordRelay',
+};
+
+class Message {
+  constructor(type, from, fromFriendly, message) {
+    this.type = type;
+    this.from = from;
+    this.fromFriendly = fromFriendly;
+    this.message = message;
+  }
+
+  /**
+   * Respond to the message.
+   *
+   * @param {str} response
+   * @returns null;
+   */
+  reply(response) {
+    switch (this.type) {
+    case MessageType.MinecraftWhisper:
+      return messenger.emit(MessageType.MinecraftWhisper, this.from, response);
+    case MessageType.DiscordDM:
+      return messenger.emit(MessageType.DiscordDM, this.from, response);
+    }
+  }
+}
+
+
 /**
  * Applies a name-based formatting replacement, similar to python's str.format method.
  * @param {string} formatString a string of the format "hello, {subject}!"
@@ -39,5 +73,5 @@ function log(source, ...args) {
 });
 
 module.exports = {
-  format, messenger, log,
+  format, messenger, log, Message, MessageType,
 };

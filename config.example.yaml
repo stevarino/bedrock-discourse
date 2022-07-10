@@ -11,7 +11,7 @@ minecraft:
       host: my-server.com
       port: 19132
       # optional commands for the bot to take upon joining
-      actions:
+      commands:
         - /say Hello World
       # relay defines minecraft <-> discord chat relays (optional)
       relay:

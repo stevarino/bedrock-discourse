@@ -14,10 +14,18 @@ function init() {
     return;
   }
 
-  common.messenger.on('discord', (channel, message) => {
+  common.messenger.on(common.MessageType.DiscordRelay, (channel, message) => {
     Object.values(channelsById).forEach(c => {
       if (c.name == channel) {
         c.channelObj.send(common.format(c.format, message));
+      }
+    });
+  });
+
+  common.messenger.on(common.MessageType.DiscordChat, (channel, message) => {
+    Object.values(channelsById).forEach(c => {
+      if (c.name == channel) {
+        c.channelObj.send(message);
       }
     });
   });
@@ -81,7 +89,7 @@ function init() {
       senderid: user_id,
       type: message.type,
     };
-    common.messenger.emit('minecraft', channel, messageObj);
+    common.messenger.emit(common.MessageType.MinecraftRelay, channel, messageObj);
   });
 
   client.login(config.discord.token);

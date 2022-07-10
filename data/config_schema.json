@@ -15,7 +15,7 @@
                                 "host": { "type": "string" },
                                 "port": { "type": "number" },
                                 "format": { "type": "string" },
-                                "actions": {
+                                "commands": {
                                     "type": "array",
                                     "items": { "type": "string" }
                                 },
@@ -34,6 +34,10 @@
                                             "additionalProperties": false
                                         }
                                     }
+                                },
+                                "groups": {
+                                    "type": "array",
+                                    "items": {"type": "string"}
                                 }
                             },
                             "required": [ "host", "port" ],
@@ -75,10 +79,26 @@
                         }
                     }
                 },
-                "nick": { "type": "string" }
+                "nick": { "type": "string" },
+                "groups": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                }
             },
             "required": [ "token", "app_id", "channels" ],
             "additionalProperties": false
+        },
+        "groups": {
+            "type": "object",
+            "patternProperties": {
+                "": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "pattern": "(m:\\d+)|(d:.*#\\d{4})"
+                    }
+                }
+            }
         }
     },
     "required": [ "minecraft" ],

@@ -4,6 +4,7 @@ const { ClientStatus } = require('bedrock-protocol/src/connection');
 const common = require('./common');
 const config = require('./config');
 const prom = require('./prom');
+const actions = require('./actions');
 
 const agents = [];
 let watchdogTimer;
@@ -30,7 +31,7 @@ class Agent {
    * A Minecraft agent, relaying chat messages and obsserving state for a
    * particular server. Not a bot, not really a client itself, its an agent!
    * @param {string} name
-   * @param {{ host: string, port: number, relay: object?, actions: array<string>? format: string? }} options
+   * @param {{ host: string, port: number, relay: object?, commands: array<string>? format: string? }} options
    */
   constructor(name, options) {
     this.name = name;
@@ -38,7 +39,7 @@ class Agent {
     this.reconnectTimer = null;
     this.tick_count = 100;
     this.players = {};
-    this.actions = [];
+    this.commands = [];
     this.relay = {};
     this.active = true;
     this.authenticated = null;
@@ -46,7 +47,17 @@ class Agent {
     this.authReject = null;
     Object.assign(this, options);
 
-    common.messenger.on('minecraft', (channel, message) => this.relayMessage(channel, message));
+    common.messenger.on(common.MessageType.MinecraftRelay, (channel, message) => {
+      this.relayMessage(channel, message);
+    });
+    common.messenger.on(common.MessageType.MinecraftWhisper, (xuid, message) => {
+      this.whisper(xuid, message);
+    });
+    common.messenger.on(common.MessageType.MinecraftChat, (server, message) => {
+      if (server == this.name) {
+        this.sendText(message);
+      }
+    });
     this.createClient();
   }
 
@@ -158,6 +169,15 @@ class Agent {
       }
     }
 
+    if (packet.type == 'whisper') {
+      actions.parseMessage(new common.Message(
+        common.MessageType.MinecraftWhisper,
+        packet.xuid,
+        packet.source_name,
+        packet.message,
+      ));
+    }
+
     if (packet.type == 'chat' && packet.source_name != this.client.username) {
       prom.CHAT.inc({
         instance: this.name,
@@ -174,7 +194,7 @@ class Agent {
         (!channel.sendOwnMessages && packet.source_name == this.client.username) ||
         (!channel.sendNotices && packet.type != 'chat')
       ) return;
-      common.messenger.emit('discord', name, messageObj);
+      common.messenger.emit(common.MessageType.DiscordRelay, name, messageObj);
     });
   }
 
@@ -207,14 +227,12 @@ class Agent {
    * @param {object} packet packet_player_list
    */
   player_list(packet) {
-    // TODO: figure out how to set this for all players? if a player message
-    //       is missed, only active players will be current. Possible solution
-    //       would be maintaining a list of all observed players, possibly
-    //       indexed by xuid.
-    // TODO: player name changes? server label changes? statefulness is hard...
     if (packet.records.type == 'add') {
       packet.records.records.forEach(r => {
-        this.players[r.uuid] = r.username;
+        this.players[r.uuid] = {
+          username: r.username,
+          xuid: r.xbox_user_id,
+        };
         if (r.username == this.client.username) {
           return;
         }
@@ -226,12 +244,12 @@ class Agent {
     }
     if (packet.records.type == 'remove') {
       packet.records.records.forEach(r => {
-        if (this.players[r.uuid] == this.client.username) {
+        if (this.players[r.uuid].username == this.client.username) {
           return;
         }
         prom.PLAYERS_ONLINE.set({
           instance: this.name,
-          player: this.players[r.uuid],
+          player: this.players[r.uuid].username,
         }, 0);
       });
     }
@@ -269,21 +287,21 @@ class Agent {
   }
 
   /**
-   * spawn signal received from bedrock client - perform any initial actions.
+   * spawn signal received from bedrock client - perform any initial commands.
    */
   spawn() {
-    if (this.actions.length > 0) {
-      this.performActions([...this.actions]);
+    if (this.commands.length > 0) {
+      this.performCommands([...this.commands]);
     }
   }
 
   /**
-   * Perform an item from a list of actions.
-   * @param {array<string>} actions
+   * Perform an item from a list of commands.
+   * @param {array<string>} commands
    */
-  performActions(actions) {
+  performCommands(commands) {
     setTimeout(() => {
-      const action = actions.shift(actions);
+      const action = commands.shift(commands);
       if (action === undefined) return;
       log(this.name, action);
       if (action.startsWith('/')) {
@@ -300,7 +318,7 @@ class Agent {
       else {
         this.sendText(action);
       }
-      this.performActions(actions);
+      this.performCommands(commands);
     }, 500);
   }
 
@@ -369,6 +387,36 @@ class Agent {
       source: message.source,
     });
     this.sendText(common.format(this.format, message));
+  }
+
+  /**
+   * Whisper a message
+   * @param {string} xuid The xbox user id of the user
+   * @param {string} message The message to whisper
+   */
+  whisper(xuid, message) {
+    Object.values(this.players).forEach(playerObj => {
+      if (playerObj.xuid == xuid) {
+        console.log(`Whispering to ${playerObj.username}: ${message}`);
+        this.client.queue('command_request', {
+          command: `w "${playerObj.username}" ${message}`,
+          interval: false,
+          origin: {
+            uuid: this.client.profile.uuid,
+            request_id: this.client.profile.uuid,
+            type: 'player',
+          },
+        });
+        // this.client.queue('text', {
+        //   type: 'raw',
+        //   needs_translation: false,
+        //   source_name: this.client.username,
+        //   xuid: '',
+        //   platform_chat_id: '',
+        //   message: `/w ${playerObj.username} ${message}`,
+        // });
+      }
+    });
   }
 
   /**
