@@ -5,11 +5,11 @@ const { validate } = require('jsonschema');
 
 function processConfig() {
   const args = process.argv.slice(2);
-  if (args.length != 1) {
-    console.log('Expected config file path as sole argument');
-    process.exit(1);
+  let filename = './config.yaml';
+  if (args.length >= 1) {
+    filename = args[0];
   }
-  const file = fs.readFileSync(args[0], 'utf8');
+  const file = fs.readFileSync(filename, 'utf8');
   const config = yaml.parse(file);
   const errors = validateConfig(config);
   if (errors.length > 0) {
