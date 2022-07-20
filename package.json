@@ -22,6 +22,8 @@
     "discord.js": "^13.7.0",
     "jsonschema": "^1.4.0",
     "prom-client": "^14.0.1",
+    "sequelize": "^6.21.2",
+    "sqlite3": "^5.0.8",
     "yaml": "^2.0.1"
   },
   "devDependencies": {
