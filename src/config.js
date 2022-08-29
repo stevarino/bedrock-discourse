@@ -13,17 +13,24 @@ function processConfig() {
   const config = yaml.parse(file);
   const errors = validateConfig(config);
   if (errors.length > 0) {
-    console.log('Invalid config file:', errors);
+    console.error('Invalid config file:', errors);
     process.exit(1);
   }
   return config;
 }
 
 function validateConfig(config) {
-  const filePath = path.join(path.dirname(__dirname), 'data', 'config_schema.json');
-  const schema = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  /** @type {Set}| */
+  const names = new Set();
+  const errors = [];
+  Object.keys(config.minecraft.servers).forEach(n => names.add(n));
+  Object.keys(config?.discord.channels ?? {}).forEach(n => {
+    if (names.has(n)) errors.push(`Multiple definitions for "${n}"`);
+  });
+  const filePath = path.join(path.dirname(__dirname), 'data', 'config_schema.yaml');
+  const schema = yaml.parse(fs.readFileSync(filePath, 'utf8'));
   const result = validate(config, schema, { allowUnknownAttributes: false });
-  return result.errors.map(e => e.stack);
+  return errors.concat(result.errors.map(e => e.stack));
 }
 
 module.exports = processConfig();

@@ -1,0 +1,56 @@
+messages:
+  en:
+    _aqua: '§b'
+    _white: '§f'
+    _red: '§c'
+    _grey: '§7'
+    _blue: '§9'
+    welcome: '{!_aqua}Welcome {username}! {checkInbox} {!inbox_help}'
+    welcome_one: '{!_aqua}Welcome {username}! {checkInbox} {!inbox_help}'
+    welcome_empty: '{!_aqua}Welcome {username}! {checkInbox} Type "{!_grey}/w {botname} help{!_aqua}" for more options.'
+    inbox_help: 'Type "{!_grey}/w {botname} read{!_aqua}" to read it, or "{!_grey}/w {botname} help{!_aqua}" for more options.'
+    inbox: 'You have {messageCount} messages!'
+    inbox__minecraft: '{!_aqua}{!inbox}'
+    inbox_one: 'You have only one message!'
+    inbox_one__minecraft: '{!_aqua}{!inbox_one}'
+    inbox_empty: 'You have no messages.'
+    inbox_empty__minecraft: '{!_aqua}{!inbox_empty}'
+    
+    mail: '[{from} {when}] {message}'
+    mail__minecraft: '§g[§d{from}§g {when}]§r {message}'
+    mail_server__minecraft: '§g[§2{from}§r§g {when}]§r {message}'
+    mail_player__minecraft: '§g[§e{from}§r§g {when}]§r {message}'
+
+    unknown_player: 'Sorry, I do not know {player}.'
+    unknown_player__minecraft: '{!_aqua}{!unknown_player}'
+    mail_sent: 'Message sent.'
+    mail_sent__minecraft: '{!_aqua}{!mail_sent}'
+    mail_received: "You've got mail!"
+    mail_received__minecraft: '{!_aqua}{!mail_received}'
+
+    success: 'Success.'
+    success__minecraft: '{!_aqua}{!success}'
+    error: 'Something went wrong.'
+    error__minecraft: '{!_red}{!error}'
+
+    relay: '[{fromFriendly}@{source})] {message}'
+    relay__minecraft: '§g[{fromFriendly}@{source}] §r{message}'
+    relay__discord: '**{fromFriendly}**@{source}: {message}'
+    log: '[{from}@{source} ({type})]: {message} {context}'
+    # mail: '[{fromFriendly}@{source}] §r{message}'
+    # mail__minecraft: '§a[{fromFriendly} §r§1({source})] §r{message}'
+
+
+    action__ping__help: Server ping.
+    action__help__help: This help message.
+    action__say__help: Repeats the message to a given channel/server.
+    action__read__help: Get the first unread messages.
+    action__check__help: Check your inbox for any mail.
+    action__send__help: "Send a message to another player. Example: send bob How's it going?"
+    action__nick__help: 'Register a nickname. Example: nick bob'
+    action__set_nick__help: 'Register a nickname for a player. Example: nick bob1234 bob'
+    action__link__help: 'Link a discord account to your Microsoft account'
+    action__link__step1: 'DM me on discord with "link {code}"'
+    action__link__step2: 'Account registered, thanks {user}!'
+    action__account__help: 'Show account information'
+

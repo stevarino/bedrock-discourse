@@ -1,6 +1,9 @@
 const Discord = require('discord.js');
+
+const actions = require('./actions');
 const config = require('./config');
 const common = require('./common');
+const routing = require('./routing');
 
 const channelsById = {};
 const guildNicks = {};
@@ -14,10 +17,27 @@ function init() {
     return;
   }
 
+  const client = new Discord.Client({
+    partials: ['CHANNEL'],
+    intents: [
+      Discord.Intents.FLAGS.GUILD_MESSAGES,
+      Discord.Intents.FLAGS.GUILDS,
+      Discord.Intents.FLAGS.DIRECT_MESSAGES,
+    ],
+  });
+
+  Object.entries(config.discord.channels).forEach(([name, channel]) => {
+    channel.name = name;
+    channelsById[channel.channel] = channel;
+    if (channel.nick !== undefined) {
+      guildNicks[channel.guild] = channel.nick;
+    }
+  });
+
   common.messenger.on(common.MessageType.DiscordRelay, (channel, message) => {
     Object.values(channelsById).forEach(c => {
       if (c.name == channel) {
-        c.channelObj.send(common.format(c.format, message));
+        c.channelObj.send(message);
       }
     });
   });
@@ -30,14 +50,9 @@ function init() {
     });
   });
 
-  const client = new Discord.Client({ intents: [Discord.Intents.FLAGS.GUILD_MESSAGES, Discord.Intents.FLAGS.GUILDS] });
-
-  Object.entries(config.discord.channels).forEach(([name, channel]) => {
-    channel.name = name;
-    channelsById[channel.channel] = channel;
-    if (channel.nick !== undefined) {
-      guildNicks[channel.guild] = channel.nick;
-    }
+  common.messenger.on(common.MessageType.DiscordDM, async (snowflake, message) => {
+    const user = await client.users.fetch(snowflake);
+    user.send(message);
   });
 
   common.messenger.on('stop', () => {
@@ -76,20 +91,25 @@ function init() {
   });
 
   client.on('messageCreate', async message => {
-    if (message.author.bot || channelsById[message.channelId] === undefined) {
+    if (message.author.bot || (channelsById[message.channelId] === undefined && message.channel.type != 'DM')) {
+      return;
+    }
+    // https://discord.js.org/#/docs/discord.js/stable/typedef/TextBasedChannelTypes
+    if (message.channel.type == 'DM') {
+      actions.parseMessage(new common.Message(
+        null, common.MessageType.DiscordDM, message.author.id,
+        `${message.author.username}#${message.author.discriminator}`,
+        message.content,
+      ));
       return;
     }
     const author = await message.guild.members.fetch(message.author);
     const user_id = `${author.user.username}#${author.user.discriminator}`;
     const channel = channelsById[message.channelId].name;
-    const messageObj = {
-      source: channel,
-      sender: author.nickname ?? user_id,
-      content: message.content,
-      senderid: user_id,
-      type: message.type,
-    };
-    common.messenger.emit(common.MessageType.MinecraftRelay, channel, messageObj);
+    routing.route(new common.Message(
+      channel, common.MessageType.DiscordChat, author.id,
+      author.nickname ?? user_id, message.content,
+    ));
   });
 
   client.login(config.discord.token);

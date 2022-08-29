@@ -1,0 +1,103 @@
+---
+type: object
+required: [minecraft]
+additionalProperties: false
+properties:
+  minecraft:
+    type: object
+    additionalProperties: false
+    required: [servers]
+    properties:
+      profilesFolder:
+        type: string
+      connectTimeout:
+        type: number
+      servers:
+        type: object
+        patternProperties:
+          '':
+            type: object
+            required: [host, port]
+            additionalProperties: false
+            properties:
+              host: {type: string}
+              port: {type: number}
+              format: {type: string}
+              commands:
+                type: array
+                items: {type: string}
+              options: {type: object}
+              routing:
+                type: object
+                patternProperties:
+                  '':
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      type:
+                        type: string
+                        enum: [relay, log, mail]
+                        default: relay
+                      headline:
+                        type: bool
+                        default: false
+                      minLength:
+                        type: number
+                        default: 20
+              groups:
+                type: array
+                items: {type: string}
+              language:
+                type: string
+                enum: [eng]
+  web:
+    type: object
+    properties:
+      host: {type: string}
+      port: {type: number}
+      enabled: {type: bool}
+      counterDelay: {type: number}
+    required: [host, port]
+    additionalProperties: false
+  discord:
+    type: object
+    required: [token, app_id, channels]
+    additionalProperties: false
+    properties:
+      token: {type: string}
+      app_id: {type: string}
+      channels:
+        type: object
+        patternProperties:
+          '':
+            type: object
+            properties:
+              guild: {type: string}
+              channel: {type: string}
+              nick: {type: string}
+              format: {type: string}
+            required: [guild, channel]
+            additionalProperties: false
+      nick: {type: string}
+      groups:
+        type: array
+        items: {type: string}
+  groups:
+    type: object
+    patternProperties:
+      '':
+        type: array
+        items:
+          type: string
+          pattern: "\\d+"
+  database:
+    type: object
+    additionalProperties: false
+    properties:
+      path: {type: string}
+      logging: {type: bool}
+      hiddenXuids:
+        type: array
+        items:
+          type: string
+          pattern: "^\\d+$"

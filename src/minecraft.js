@@ -3,7 +3,9 @@ const { ClientStatus } = require('bedrock-protocol/src/connection');
 
 const common = require('./common');
 const config = require('./config');
+const database = require('./database');
 const prom = require('./prom');
+const routing = require('./routing');
 const actions = require('./actions');
 
 const agents = [];
@@ -34,6 +36,7 @@ class Agent {
    * @param {{ host: string, port: number, relay: object?, commands: array<string>? format: string? }} options
    */
   constructor(name, options) {
+    this.db = database.instance();
     this.name = name;
     this.ticks = [];
     this.reconnectTimer = null;
@@ -45,6 +48,7 @@ class Agent {
     this.authenticated = null;
     this.authResolve = null;
     this.authReject = null;
+    this.language = 'en';
     Object.assign(this, options);
 
     common.messenger.on(common.MessageType.MinecraftRelay, (channel, message) => {
@@ -57,6 +61,15 @@ class Agent {
       if (server == this.name) {
         this.sendText(message);
       }
+    });
+    common.messenger.on(common.MessageType.EventServerHasMail, server => {
+      if (server !== name) return;
+      Object.values(this.players).forEach(p => {
+        this.whisper(p.xuid, common.template(this.language, ['mail_received__minecraft', 'mail_received']));
+      });
+    });
+    common.messenger.on(common.MessageType.EventPlayerHasMail, xuid => {
+      this.whisper(xuid, common.template(this.language, ['mail_received__minecraft', 'mail_received']));
     });
     this.createClient();
   }
@@ -136,24 +149,32 @@ class Agent {
    * @param {object} packet packet_text
    */
   text(packet) {
-    const messageObj = {
-      source: this.name,
-      sender: packet.source_name,
-      content: packet.message,
-      senderid: packet.xuid,
-      type: packet.type,
-      parameters: packet.parameters,
-    };
+    if (['tip', 'jukebox_popup', 'popup'].includes(packet.type)) {
+      return;
+    }
+    const msg = new common.Message(
+      this.name,
+      'Minecraft' + common.capitalize(packet.type),
+      packet.xuid,
+      packet.source_name,
+      packet.message,
+      {
+        language: this.language,
+        type: packet.type,
+        parameters: packet.parameters,
+      },
+    );
+    if (packet.source_name != this.client.username) {
+      routing.route(msg);
+    }
 
     if (packet.type == 'translation') {
       if (packet.message.startsWith('death.')) {
         if (deaths.includes(packet.message)) {
           this.countDeath(packet.parameters[0], packet.message.split('.').pop());
-        }
-        else if (falls.includes(packet.message)) {
+        } else if (falls.includes(packet.message)) {
           this.countDeath(packet.parameters[0], 'fall');
-        }
-        else {
+        } else {
           this.countDeath(packet.parameters[0], packet.parameters.length > 1 ?
             packet.parameters[1] : '');
         }
@@ -170,12 +191,7 @@ class Agent {
     }
 
     if (packet.type == 'whisper') {
-      actions.parseMessage(new common.Message(
-        common.MessageType.MinecraftWhisper,
-        packet.xuid,
-        packet.source_name,
-        packet.message,
-      ));
+      actions.parseMessage(msg);
     }
 
     if (packet.type == 'chat' && packet.source_name != this.client.username) {
@@ -184,18 +200,6 @@ class Agent {
         source: packet.source_name,
       });
     }
-
-    if (['tip', 'jukebox_popup', 'popup'].includes(packet.type)) {
-      return;
-    }
-    Object.entries(this.relay).forEach(([name, channel]) => {
-      if (
-        (channel.receiveOnly) ||
-        (!channel.sendOwnMessages && packet.source_name == this.client.username) ||
-        (!channel.sendNotices && packet.type != 'chat')
-      ) return;
-      common.messenger.emit(common.MessageType.DiscordRelay, name, messageObj);
-    });
   }
 
   /**
@@ -226,9 +230,13 @@ class Agent {
    * player_list signal received from bedrock client.
    * @param {object} packet packet_player_list
    */
-  player_list(packet) {
+  async player_list(packet) {
     if (packet.records.type == 'add') {
+      const newPlayers = new Set();
       packet.records.records.forEach(r => {
+        if (this.players[r.uuid] === undefined) {
+          newPlayers.add(r.uuid);
+        }
         this.players[r.uuid] = {
           username: r.username,
           xuid: r.xbox_user_id,
@@ -241,9 +249,36 @@ class Agent {
           player: r.username,
         }, 1);
       });
+      const playerMap = {};
+      Object.values(this.players).forEach(p => playerMap[p.xuid] = p.username);
+      await this.db.checkInPlayers(this.name, playerMap);
+      for (const p of newPlayers) {
+        // TODO: track these timeouts for cancelling
+        setTimeout(async () => {
+          const messageCount = await this.db.countPlayerMessages(this.name, this.players[p].xuid);
+          const templates = ['welcome'];
+          const inboxTemplates = ['inbox'];
+          if (messageCount == 0) {
+            templates.unshift('welcome_empty');
+            inboxTemplates.unshift('inbox_none');
+          }
+          if (messageCount == 1) {
+            templates.unshift('welcome_one');
+            inboxTemplates.unshift('inbox_one');
+          }
+          const message = common.template(this.language, templates, {
+            username: this.players[p].username,
+            botname: this.client.username,
+            messageCount: messageCount,
+            checkInbox: (values) => common.template(this.language, inboxTemplates, values),
+          });
+          this.whisper(this.players[p].xuid, message);
+        }, 25_000 + Math.random() * 10_000);
+      }
     }
     if (packet.records.type == 'remove') {
       packet.records.records.forEach(r => {
+        console.log(packet.records.type, r);
         if (this.players[r.uuid].username == this.client.username) {
           return;
         }
@@ -251,6 +286,7 @@ class Agent {
           instance: this.name,
           player: this.players[r.uuid].username,
         }, 0);
+        delete this.players[r.uuid];
       });
     }
   }
@@ -314,8 +350,7 @@ class Agent {
             type: 'player',
           },
         });
-      }
-      else {
+      } else {
         this.sendText(action);
       }
       this.performCommands(commands);
@@ -375,38 +410,28 @@ class Agent {
 
   /**
    * Handle a relayed message from discord.
+   *
    * @param {string} channel
-   * @param {{object}} message
-   * @returns null
+   * @param {common.Message} message
    */
   relayMessage(channel, message) {
-    if (this.relay[channel] === undefined) return;
-    if (this.relay[channel].sendOnly) return;
     prom.CHAT.inc({
       instance: this.name,
       source: message.source,
     });
-    this.sendText(common.format(this.format, message));
+    this.tellraw('@a', message);
   }
 
   /**
    * Whisper a message
+   *
    * @param {string} xuid The xbox user id of the user
    * @param {string} message The message to whisper
    */
   whisper(xuid, message) {
     Object.values(this.players).forEach(playerObj => {
       if (playerObj.xuid == xuid) {
-        console.log(`Whispering to ${playerObj.username}: ${message}`);
-        this.client.queue('command_request', {
-          command: `w "${playerObj.username}" ${message}`,
-          interval: false,
-          origin: {
-            uuid: this.client.profile.uuid,
-            request_id: this.client.profile.uuid,
-            type: 'player',
-          },
-        });
+        this.tellraw(playerObj.username, message);
         // this.client.queue('text', {
         //   type: 'raw',
         //   needs_translation: false,
@@ -416,6 +441,26 @@ class Agent {
         //   message: `/w ${playerObj.username} ${message}`,
         // });
       }
+    });
+  }
+
+  /**
+   * Send a rawtext message to the specified target(s).
+   *
+   * @param {string} target who to send to (player name, @a, etc)
+   * @param {string} message message to send
+   */
+  tellraw(target, message) {
+    if (target.includes(' ')) target = `"${target}"`;
+    const command = `tellraw ${target} {"rawtext": [{"text": "${message.replace(/"/g, '\\"')}"}]}`;
+    this.client.queue('command_request', {
+      command: command,
+      interval: false,
+      origin: {
+        uuid: this.client.profile.uuid,
+        request_id: this.client.profile.uuid,
+        type: 'player',
+      },
     });
   }
 
@@ -437,6 +482,7 @@ class Agent {
    * @param {string} message
    */
   sendText(message) {
+    // this.tellraw('@a', message);
     this.client.queue('text', {
       type: 'chat',
       needs_translation: false,
@@ -464,8 +510,7 @@ async function init() {
     agents.push(agent);
     try {
       await agent.onReady();
-    }
-    catch (e) {
+    } catch (e) {
       console.error(e);
     }
   }

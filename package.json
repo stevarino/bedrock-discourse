@@ -4,7 +4,7 @@
   "description": "A Minecraft Bedrock chat relay with auxillary monitoring features.",
   "main": "index.js",
   "scripts": {
-    "test": "test.js",
+    "test": "ava",
     "windowsDebug": "@powershell -Command $env:DEBUG='*';node index.js ./config.yaml"
   },
   "keywords": [
@@ -27,6 +27,7 @@
     "yaml": "^2.0.1"
   },
   "devDependencies": {
+    "ava": "^4.3.1",
     "eslint": "^8.15.0"
   }
 }
