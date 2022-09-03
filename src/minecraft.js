@@ -49,6 +49,7 @@ class Agent {
     this.authResolve = null;
     this.authReject = null;
     this.language = 'en';
+    this.timers = Set();
     Object.assign(this, options);
 
     common.messenger.on(common.MessageType.MinecraftRelay, (channel, message) => {
@@ -253,8 +254,8 @@ class Agent {
       Object.values(this.players).forEach(p => playerMap[p.xuid] = p.username);
       await this.db.checkInPlayers(this.name, playerMap);
       for (const p of newPlayers) {
-        // TODO: track these timeouts for cancelling
-        setTimeout(async () => {
+        const timer = setTimeout(async () => {
+          this.timers.delete(timer);
           const messageCount = await this.db.countPlayerMessages(this.name, this.players[p].xuid);
           const templates = ['welcome'];
           const inboxTemplates = ['inbox'];
@@ -274,6 +275,7 @@ class Agent {
           });
           this.whisper(this.players[p].xuid, message);
         }, 25_000 + Math.random() * 10_000);
+        this.timers.add(timer);
       }
     }
     if (packet.records.type == 'remove') {
@@ -388,6 +390,10 @@ class Agent {
    */
   stop() {
     log(`${this.name} stop`);
+    this.timers.forEach(t => {
+      clearTimeout(t);
+    });
+    this.timers.clear();
     this.active = false;
     this.client.disconnect();
     this.client.close();
