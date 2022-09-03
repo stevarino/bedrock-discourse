@@ -326,6 +326,8 @@ class DatabaseWrapper {
       return false;
     }
     const player = await this.Player.findOne({ where: { xboxId } });
+    if (player === null) return false;
+
     await player.update({ nickname });
     playerCache[player.xboxId].merge(player.toJSON());
     this.updatePlayerList();
