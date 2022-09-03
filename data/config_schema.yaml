@@ -74,9 +74,14 @@ properties:
             properties:
               guild: {type: string}
               channel: {type: string}
+              url:
+                type: string
+                pattern: '^https://discord\.com/channels/[0-9]+/[0-9]+$'
               nick: {type: string}
               format: {type: string}
-            required: [guild, channel]
+            oneOf:
+              - required: [guild, channel]
+              - required: [url]
             additionalProperties: false
       nick: {type: string}
       groups:

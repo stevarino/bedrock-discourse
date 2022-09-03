@@ -7,6 +7,8 @@ const routing = require('./routing');
 
 const channelsById = {};
 const guildNicks = {};
+const permissions = '378024314880';
+const channelUrl = new RegExp('^https://discord\\.com/channels/([0-9]+)/([0-9]+)$');
 
 /**
  * Initialize discord client, if configured.
@@ -16,6 +18,7 @@ function init() {
   if (config.discord === undefined) {
     return;
   }
+  log(`Add to server: https://discord.com/api/oauth2/authorize?client_id=${config.discord.app_id}&permissions=${permissions}&scope=bot`);
 
   const client = new Discord.Client({
     partials: ['CHANNEL'],
@@ -28,6 +31,12 @@ function init() {
 
   Object.entries(config.discord.channels).forEach(([name, channel]) => {
     channel.name = name;
+    if (channel.url !== undefined) {
+      const result = channelUrl.exec(channel.url);
+      if (result === null) throw new Error(`Unrecognized URL: ${channel.url}`);
+      channel.guild = result[1];
+      channel.channel = result[2];
+    }
     channelsById[channel.channel] = channel;
     if (channel.nick !== undefined) {
       guildNicks[channel.guild] = channel.nick;
