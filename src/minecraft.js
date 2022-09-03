@@ -89,7 +89,7 @@ class Agent {
     const options = {
       host: this.host,
       port: this.port,
-      conLog: (...args) => log(`${this.name} [conlog]: `, ...args),
+      conLog: (...args) => this.log('[conlog]', ...args),
     };
     if (config.minecraft.profilesFolder !== undefined) {
       options['profilesFolder'] = config.minecraft.profilesFolder;
@@ -118,11 +118,11 @@ class Agent {
   }
 
   packet_ping_timeout() {
-    log('ping_timeout');
+    this.log('ping_timeout');
   }
 
   packet_session() {
-    log('authenticated');
+    this.log('authenticated');
     this.authResolve();
   }
 
@@ -135,7 +135,7 @@ class Agent {
    * @param  {...any} args
    */
   packet_error(...args) {
-    log(`${this.name} [error]: `, ...args);
+    this.log('[error]', ...args);
     this.authReject(...args);
   }
 
@@ -190,7 +190,6 @@ class Agent {
             player: player,
           });
         });
-        log(packet);
       }
     }
 
@@ -238,20 +237,21 @@ class Agent {
     if (packet.records.type == 'add') {
       const newPlayers = new Set();
       packet.records.records.forEach(r => {
-        if (this.players[r.uuid] === undefined) {
+        const isNotMe = r.username !== this.client.username;
+        if (this.players[r.uuid] === undefined && isNotMe) {
           newPlayers.add(r.uuid);
         }
         this.players[r.uuid] = {
           username: r.username,
           xuid: r.xbox_user_id,
         };
-        if (r.username == this.client.username) {
-          return;
+        if (isNotMe) {
+          this.log(packet.records.type, this.players[r.uuid].username);
+          prom.PLAYERS_ONLINE.set({
+            instance: this.name,
+            player: r.username,
+          }, 1);
         }
-        prom.PLAYERS_ONLINE.set({
-          instance: this.name,
-          player: r.username,
-        }, 1);
       });
       const playerMap = {};
       Object.values(this.players).forEach(p => playerMap[p.xuid] = p.username);
@@ -283,10 +283,10 @@ class Agent {
     }
     if (packet.records.type == 'remove') {
       packet.records.records.forEach(r => {
-        console.log(packet.records.type, r);
         if (this.players[r.uuid].username == this.client.username) {
           return;
         }
+        this.log(packet.records.type, this.players[r.uuid].username);
         prom.PLAYERS_ONLINE.set({
           instance: this.name,
           player: this.players[r.uuid].username,
@@ -318,7 +318,7 @@ class Agent {
    */
   packet_start_game(packet) {
     const profile = JSON.stringify(this.client.profile);
-    log(`${this.name}: logged in as ${this.client.username} (${profile})`);
+    this.log(`logged in as ${this.client.username} (${profile})`);
     prom.WEATHER.set(
       { instance: this.name },
       packet.lightning_level > 0 ? 2 : (packet.rain_level > 0 ? 1 : 0),
@@ -344,7 +344,7 @@ class Agent {
     setTimeout(() => {
       const action = commands.shift(commands);
       if (action === undefined) return;
-      log(this.name, action);
+      this.log(action);
       if (action.startsWith('/')) {
         this.client.queue('command_request', {
           command: action.slice(1),
@@ -366,7 +366,7 @@ class Agent {
    * Close signal received from bedrock client.
    */
   packet_close() {
-    log(`${this.name} close`);
+    this.log('close');
     if (this.active && this.reconnectTimer === null) {
       this.reconnectTimer = setTimeout(() => this.reconnect(10), 500);
     }
@@ -381,7 +381,7 @@ class Agent {
       return;
     }
     timeout = Math.min(timeout * 1.5, 300);
-    log(`${this.name} disconnected - reconnecting (${timeout}s)`);
+    this.log(`disconnected - reconnecting (${timeout}s)`);
     if (this.client.status == ClientStatus.Disconnected) {
       this.createClient();
     }
@@ -392,7 +392,7 @@ class Agent {
    * Stop signal received from application (ctrl-c).
    */
   stop() {
-    log(`${this.name} stop`);
+    this.log('stop');
     this.timers.forEach(t => {
       clearTimeout(t);
     });
@@ -401,7 +401,7 @@ class Agent {
     this.client.disconnect();
     this.client.close();
     if (this.reconnectTimer !== null) {
-      log(this.name, ' reconnection stopped');
+      this.log('reconnection stopped');
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
@@ -411,7 +411,7 @@ class Agent {
    * Disconnect signal received from bedrock client.
    */
   packet_disconnect() {
-    log(`${this.name} disconnected`);
+    this.log('disconnected');
     if (this.active && this.reconnectTimer === null) {
       this.reconnectTimer = setTimeout(() => this.reconnect(10), 500);
     }
@@ -494,6 +494,10 @@ class Agent {
       message: message,
     });
   }
+
+  log(...args) {
+    log(`${this.name}: `, ...args);
+  }
 }
 
 /**
@@ -507,7 +511,7 @@ async function init() {
   watchdogTimer = setInterval(watchdog, ms);
 
   for (const name in config.minecraft.servers) {
-    log(`Starting ${name}`);
+    log('Starting ', name);
     const agent = new Agent(name, config.minecraft.servers[name]);
     agents.push(agent);
     try {
