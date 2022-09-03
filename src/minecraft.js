@@ -49,7 +49,7 @@ class Agent {
     this.authResolve = null;
     this.authReject = null;
     this.language = 'en';
-    this.timers = Set();
+    this.timers = new Set();
     Object.assign(this, options);
 
     common.messenger.on(common.MessageType.MinecraftRelay, (channel, message) => {
@@ -110,15 +110,18 @@ class Agent {
       'start_game', 'close', 'disconnect', 'error', 'spawn', 'ping_timeout',
       'session',
     ].forEach(event => {
-      this.client.on(event, packet => this[event](packet));
+      if (this[`packet_${event}`] == undefined) {
+        throw new Error(`Missing event: ${event}`);
+      }
+      this.client.on(event, packet => this[`packet_${event}`](packet));
     });
   }
 
-  ping_timeout() {
+  packet_ping_timeout() {
     log('ping_timeout');
   }
 
-  session() {
+  packet_session() {
     log('authenticated');
     this.authResolve();
   }
@@ -131,7 +134,7 @@ class Agent {
    * Handle error messages from bedrock client.
    * @param  {...any} args
    */
-  error(...args) {
+  packet_error(...args) {
     log(`${this.name} [error]: `, ...args);
     this.authReject(...args);
   }
@@ -140,7 +143,7 @@ class Agent {
    * set_time signal received from bedrock client.
    * @param {object} packet packet_set_time
    */
-  set_time(packet) {
+  packet_set_time(packet) {
     prom.TIME.set({ instance: this.name }, packet.time);
   }
 
@@ -149,7 +152,7 @@ class Agent {
    * death/sleep translation messages.
    * @param {object} packet packet_text
    */
-  text(packet) {
+  packet_text(packet) {
     if (['tip', 'jukebox_popup', 'popup'].includes(packet.type)) {
       return;
     }
@@ -207,7 +210,7 @@ class Agent {
    * heartbeat signal received from bedrock client - calculate tps.
    * @param {object} packet packet_heartbeat
    */
-  heartbeat(packet) {
+  packet_heartbeat(packet) {
     const now = [new Date().getTime(), packet];
     this.ticks.unshift(now);
     let cnt = this.ticks.length;
@@ -231,7 +234,7 @@ class Agent {
    * player_list signal received from bedrock client.
    * @param {object} packet packet_player_list
    */
-  async player_list(packet) {
+  async packet_player_list(packet) {
     if (packet.records.type == 'add') {
       const newPlayers = new Set();
       packet.records.records.forEach(r => {
@@ -297,7 +300,7 @@ class Agent {
    * level_event signal received from bedrock client - primarily weather.
    * @param {object} packet packet_level_event
    */
-  level_event(packet) {
+  packet_level_event(packet) {
     const weather = {
       start_rain: 1,
       stop_rain: 0,
@@ -313,7 +316,7 @@ class Agent {
    * start_game signal received from bedrock client - initialize metrics.
    * @param {object} packet packet_start_game
    */
-  start_game(packet) {
+  packet_start_game(packet) {
     const profile = JSON.stringify(this.client.profile);
     log(`${this.name}: logged in as ${this.client.username} (${profile})`);
     prom.WEATHER.set(
@@ -327,7 +330,7 @@ class Agent {
   /**
    * spawn signal received from bedrock client - perform any initial commands.
    */
-  spawn() {
+  packet_spawn() {
     if (this.commands.length > 0) {
       this.performCommands([...this.commands]);
     }
@@ -362,7 +365,7 @@ class Agent {
   /**
    * Close signal received from bedrock client.
    */
-  close() {
+  packet_close() {
     log(`${this.name} close`);
     if (this.active && this.reconnectTimer === null) {
       this.reconnectTimer = setTimeout(() => this.reconnect(10), 500);
@@ -407,7 +410,7 @@ class Agent {
   /**
    * Disconnect signal received from bedrock client.
    */
-  disconnect() {
+  packet_disconnect() {
     log(`${this.name} disconnected`);
     if (this.active && this.reconnectTimer === null) {
       this.reconnectTimer = setTimeout(() => this.reconnect(10), 500);
@@ -438,14 +441,6 @@ class Agent {
     Object.values(this.players).forEach(playerObj => {
       if (playerObj.xuid == xuid) {
         this.tellraw(playerObj.username, message);
-        // this.client.queue('text', {
-        //   type: 'raw',
-        //   needs_translation: false,
-        //   source_name: this.client.username,
-        //   xuid: '',
-        //   platform_chat_id: '',
-        //   message: `/w ${playerObj.username} ${message}`,
-        // });
       }
     });
   }
@@ -458,7 +453,8 @@ class Agent {
    */
   tellraw(target, message) {
     if (target.includes(' ')) target = `"${target}"`;
-    const command = `tellraw ${target} {"rawtext": [{"text": "${message.replace(/"/g, '\\"')}"}]}`;
+    const safequote = message.replace(/"/g, '\\"');
+    const command = `tellraw ${target} {"rawtext": [{"text": "${safequote}"}]}`;
     this.client.queue('command_request', {
       command: command,
       interval: false,
