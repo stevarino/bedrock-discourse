@@ -246,7 +246,7 @@ class Agent {
           xuid: r.xbox_user_id,
         };
         if (isNotMe) {
-          this.log(`${packet.records.type}: ${this.players[r.uuid].username} (${r.uuid})`);
+          this.log(`${packet.records.type}: ${this.players[r.uuid].username} (${this.players[r.uuid].xuid})`);
           prom.PLAYERS_ONLINE.set({
             instance: this.name,
             player: r.username,
@@ -291,7 +291,7 @@ class Agent {
         if (this.players[r.uuid].username == this.client.username) {
           return;
         }
-        this.log(`${packet.records.type}: ${this.players[r.uuid].username} (${r.uuid})`);
+        this.log(`${packet.records.type}: ${this.players[r.uuid].username} (${this.players[r.uuid].xuid})`);
         prom.PLAYERS_ONLINE.set({
           instance: this.name,
           player: this.players[r.uuid].username,
