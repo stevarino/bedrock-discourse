@@ -246,7 +246,7 @@ class Agent {
           xuid: r.xbox_user_id,
         };
         if (isNotMe) {
-          this.log(packet.records.type, this.players[r.uuid].username);
+          this.log(`${packet.records.type}: ${this.players[r.uuid].username} (${r.uuid})`);
           prom.PLAYERS_ONLINE.set({
             instance: this.name,
             player: r.username,
@@ -259,6 +259,11 @@ class Agent {
       for (const p of newPlayers) {
         const timer = setTimeout(async () => {
           this.timers.delete(timer);
+          const xuid = this.players[p]?.xuid;
+          if (xuid === undefined) {
+            this.log(`WARNING: unrecognized xuid: ${p}`);
+            return;
+          }
           const messageCount = await this.db.countPlayerMessages(this.name, this.players[p].xuid);
           const templates = ['welcome'];
           const inboxTemplates = ['inbox'];
@@ -286,7 +291,7 @@ class Agent {
         if (this.players[r.uuid].username == this.client.username) {
           return;
         }
-        this.log(packet.records.type, this.players[r.uuid].username);
+        this.log(`${packet.records.type}: ${this.players[r.uuid].username} (${r.uuid})`);
         prom.PLAYERS_ONLINE.set({
           instance: this.name,
           player: this.players[r.uuid].username,
