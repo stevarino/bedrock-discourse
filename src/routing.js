@@ -81,12 +81,12 @@ function generateNetworks(config) {
     }
     Object.entries(options.routing).forEach(([routeName, routeOptions]) => {
       routeOptions.type = routeOptions.type ?? 'relay';
+      routeOptions.platform = getPlatform(config, routeName);
       if (types[routeName] !== undefined && types[routeName] !== routeOptions.type) {
         throw new Error(`Inconsistent routing types: ${types[routeName]} / ${routeOptions.type}`);
       }
       types[routeName] = routeOptions.type;
       if (routeOptions.type == 'relay') {
-        routeOptions.platform = getPlatform(config, routeName);
         network.add(routeOptions.type, routeName, routeOptions);
         if (networks[routeName] === undefined) {
           networks[routeName] = network;
@@ -101,7 +101,6 @@ function generateNetworks(config) {
           }
         }
       } else if (routeOptions.type == 'log') {
-        routeOptions.platform = getPlatform(config, routeName);
         network.add('log', routeName, routeOptions);
       } else if (routeOptions.type == 'mail') {
         if (mailers[routeName] === undefined) mailers[routeName] = [];
@@ -138,8 +137,6 @@ function route(message, networks, mailers) {
   // LOGS
   Object.entries(networks[message.source]?.log ?? {}).forEach(([dest, options]) => {
     if (dest == message.source) return;
-    if (message.isMinecraft()) return;
-    if (['MinecraftChat', 'DiscordChat'].includes(message.type)) return;
     common.emit(
       common.capitalize(options.platform) + 'Chat', dest,
       common.template('', common.getPlatformTemplates(options.platform, 'log'), message),
