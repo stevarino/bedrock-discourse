@@ -426,12 +426,14 @@ class Agent {
    * Handle a relayed message from discord.
    *
    * @param {string} channel
-   * @param {common.Message} message
+   * @param {string} message
    */
   relayMessage(channel, message) {
+    if (this.name !== channel) return;
+    this.log('relay:', channel, message);
     prom.CHAT.inc({
       instance: this.name,
-      source: message.source,
+      source: 'relay',
     });
     this.tellraw('@a', message);
   }
