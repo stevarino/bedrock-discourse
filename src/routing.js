@@ -1,7 +1,11 @@
 const common = require('./common');
 
+let relay_id = 0;
+
 class RelayNetwork {
   constructor() {
+    this.id = relay_id;
+    relay_id += 1;
     this.relay = {};
     this.log = {};
   }
@@ -110,6 +114,11 @@ function generateNetworks(config) {
       }
     });
   });
+  console.log(JSON.stringify(
+    networks,
+    (k, v) => (v instanceof Set ? [...v] : v),
+    2,
+  ));
   return [networks, mailers];
 }
 
