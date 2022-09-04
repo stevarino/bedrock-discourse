@@ -168,6 +168,7 @@ class Agent {
         parameters: packet.parameters,
       },
     );
+    this.log('Incoming: ', msg);
     if (packet.source_name != this.client.username) {
       routing.route(msg);
     }
@@ -430,7 +431,6 @@ class Agent {
    */
   relayMessage(channel, message) {
     if (this.name !== channel) return;
-    this.log('relay:', channel, message);
     prom.CHAT.inc({
       instance: this.name,
       source: 'relay',
@@ -459,9 +459,18 @@ class Agent {
    * @param {string} message message to send
    */
   tellraw(target, message) {
+    if (target == '@a') {
+      // https://bugs.mojang.com/browse/MCPE-161922
+      Object.values(this.players).forEach(p => {
+        this.tellraw(p.username, message);
+      });
+      return;
+    }
+    if (target == this.client.username) return;
     if (target.includes(' ')) target = `"${target}"`;
     const safequote = message.replace(/"/g, '\\"');
     const command = `tellraw ${target} {"rawtext": [{"text": "${safequote}"}]}`;
+    this.log(command);
     this.client.queue('command_request', {
       command: command,
       interval: false,
