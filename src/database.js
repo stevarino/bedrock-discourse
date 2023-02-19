@@ -321,12 +321,19 @@ class DatabaseWrapper {
    * @returns {bool} if registration successful
    */
   async registerNick(xboxId, nickname) {
-    if (!/[a-zA-Z0-9_-]{3,}/.test(nickname)) return false;
+    if (!/[a-zA-Z0-9_-]{3,}/.test(nickname)) {
+      common.log(`registerNick: invalid nickname (pattern): ${nickname}`)
+      return false;
+    }
     if (await this.playerNameToXBoxId(nickname) !== undefined) {
+      common.log(`registerNick: invalid nickname (exists): ${nickname}`)
       return false;
     }
     const player = await this.Player.findOne({ where: { xboxId } });
-    if (player === null) return false;
+    if (player === null) {
+      common.log('registerNick: invalid xboxId')
+      return false;
+    }
 
     await player.update({ nickname });
     playerCache[player.xboxId].merge(player.toJSON());
