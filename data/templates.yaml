@@ -49,6 +49,7 @@ messages:
     action__send__help: "Send a message to another player. Example: send bob How's it going?"
     action__nick__help: 'Register a nickname. Example: nick bob'
     action__set_nick__help: 'Register a nickname for a player. Example: nick bob1234 bob'
+    action__list_players__help: 'List players currently in the server.'
     action__link__help: 'Link a discord account to your Microsoft account'
     action__link__step1: 'DM me on discord with "link {code}"'
     action__link__step2: 'Account registered, thanks {user}!'

@@ -352,20 +352,28 @@ class Agent {
       if (action === undefined) return;
       this.log(action);
       if (action.startsWith('/')) {
-        this.client.queue('command_request', {
-          command: action.slice(1),
-          interval: false,
-          origin: {
-            uuid: this.client.profile.uuid,
-            request_id: this.client.profile.uuid,
-            type: 'player',
-          },
-        });
+        this.sendCommand(action.slice(1));
       } else {
         this.sendText(action);
       }
       this.performCommands(commands);
     }, 500);
+  }
+
+  /**
+   * Send a command request to the server.
+   */
+  sendCommand(command) {
+    this.client.queue('command_request', {
+      command: command,
+      internal: false,
+      version: 52,
+      origin: {
+        uuid: this.client.profile.uuid,
+        request_id: this.client.profile.uuid,
+        type: 'player',
+      },
+    });
   }
 
   /**
@@ -471,15 +479,7 @@ class Agent {
     const safequote = message.replace(/"/g, '\\"');
     const command = `tellraw ${target} {"rawtext": [{"text": "${safequote}"}]}`;
     this.log(command);
-    this.client.queue('command_request', {
-      command: command,
-      interval: false,
-      origin: {
-        uuid: this.client.profile.uuid,
-        request_id: this.client.profile.uuid,
-        type: 'player',
-      },
-    });
+    this.sendCommand(command);
   }
 
   /**
@@ -544,7 +544,7 @@ async function init() {
 function watchdog() {
   agents.forEach(agent => {
     if (agent.client.status === ClientStatus.Disconnected && agent.reconnectTimer === null) {
-      agent.close();
+      agent.stop();
     }
     if (agent.client.status === ClientStatus.Initialized && agent.reconnectTimer !== null) {
       agent.reconnectTimer = null;
