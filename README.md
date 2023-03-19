@@ -1,6 +1,6 @@
 # Pocket Prattle
 
-A Minecraft Bedrock (aka Pocket Edition) bot that provides server monitoring, Discord relay features, and general server administration features.
+A Minecraft Bedrock (aka Pocket Edition) bot that provides server monitoring, Discord relay, and other server administration features.
 
 What Pocket Prattle is not:
 
@@ -10,20 +10,20 @@ What Pocket Prattle is not:
 
  What Pocket Prattle is:
 
-  - Chat relay, allowing users on consoles to use their phones to communicate to your Minecraft worlds.
-  - Chat logger, allowing you to keep detailed statistics and logs of Minecraft activity (log in, out, chat messages, deaths, and other messages).
-  - Server performance monitor, including accurate server ticks per second (TPS) monitor.
-  - An in-game email server, allowing for asyncronous email via announcements.
-  - A command-line client, allowing arbitrary commands to be run from either discord or in-game. These require server specific commands to be configured, but possible examples include:
+  - Chat relay via Discord, allowing users on consoles to use their phones for chat or afk players to participate with in-game events.
+  - Event logger, allowing you to keep detailed statistics and logs of Minecraft activity (log in/out, chat messages, deaths, etc).
+  - Server performance monitor, including server-side ticks per second (TPS).
+  - In-game email server, allowing for asyncronous messaging such as announcements.
+  - A command-line client, allowing arbitrary commands to be run from either discord or in-game with robust access-control. These require server specific commands to be configured, but possible examples include:
       - Editing the allowlist
       - Allowing teleport, creative mode, and other minecraft server commands, regardless of cheats settings.
       - Monitoring server health remotely.
       - Restarting Minecraft server.
       - Updating Minecraft server.
 
-See the [configuration file example](config-example.yaml) for an overview of the features and the [configuration schema](data/config_schema.yaml) for detailed documentation of all the features. 
+See the [configuration file example](config-example.yaml) for an minimal setup and the [configuration schema](data/config_schema.yaml) for detailed documentation of all the features. 
 
-A minimal `config.yaml` file consists of just a single Minecraft server entry. To run the bot, enter the following command:
+To run the bot, enter the following command after creating your config file:
 
 ```
 nodejs index.js config.yaml
