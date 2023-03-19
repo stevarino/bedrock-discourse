@@ -54,4 +54,5 @@ messages:
     action__link__step1: 'DM me on discord with "link {code}"'
     action__link__step2: 'Account registered, thanks {user}!'
     action__account__help: 'Show account information'
+    action__reload_config__help: 'Reload config for updating ACL and Command configuration only.'
 

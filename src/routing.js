@@ -159,18 +159,21 @@ function route(message, networks, mailers) {
       common.emit(
         common.MessageType.EventServerSendMail,
         // NOTE: only use fromFriendly as discord id's are useless.
-        new common.Message(
-          message.source, common.MessageType.EventServerSendMail,
-          message.fromFriendly, message.fromFriendly, message.message,
-          { server: dest.server },
-        ),
+        new common.Message({
+          source: message.source,
+          type: common.MessageType.EventServerSendMail,
+          from: message.fromFriendly,
+          fromFriendly: message.fromFriendly,
+          message: message.message,
+          context: { server: dest.server },
+        }),
       );
     });
   }
 }
 
 function init() {
-  const config = require('./config');
+  const config = require('./config').get();
   const [networks, mailers] = generateNetworks(config);
   Object.assign(NETWORKS, networks);
   Object.assign(MAILERS, mailers);

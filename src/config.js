@@ -3,6 +3,13 @@ const yaml = require('yaml');
 const path = require('path');
 const { validate } = require('jsonschema');
 
+const CONFIG = {};
+
+function get() {
+  if (CONFIG) return CONFIG;
+  return Object.assign(CONFIG, processConfig());
+}
+
 function processConfig() {
   const args = process.argv.slice(2);
   let filename = './config.yaml';
@@ -33,4 +40,4 @@ function validateConfig(config) {
   return errors.concat(result.errors.map(e => e.stack));
 }
 
-module.exports = processConfig();
+module.exports = { processConfig, get };

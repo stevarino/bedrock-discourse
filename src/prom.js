@@ -91,11 +91,11 @@ class Counter {
 /**
  * Initializes a Prometheus client web endpoint, if configured.
  *
- * @returns null
+ * @returns {null}
  */
 async function init(config) {
   if (config === undefined) {
-    config = require('./config');
+    config = require('./config').get();
   }
   _COUNTERS.forEach(cntr => cntr.init(config));
   if (config.web === undefined || config.web.enabled === false) {

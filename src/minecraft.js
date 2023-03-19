@@ -2,7 +2,7 @@ const bedrock = require('bedrock-protocol');
 const { ClientStatus } = require('bedrock-protocol/src/connection');
 
 const common = require('./common');
-const config = require('./config');
+const config = require('./config').get();
 const database = require('./database');
 const prom = require('./prom');
 const routing = require('./routing');
@@ -156,18 +156,18 @@ class Agent {
     if (['tip', 'jukebox_popup', 'popup'].includes(packet.type)) {
       return;
     }
-    const msg = new common.Message(
-      this.name,
-      'Minecraft' + common.capitalize(packet.type),
-      packet.xuid,
-      packet.source_name,
-      packet.message,
-      {
+    const msg = new common.Message({
+      source: this.name,
+      type: 'Minecraft' + common.capitalize(packet.type),
+      from: packet.xuid,
+      fromFriendly: packet.source_name,
+      message: packet.message,
+      context: {
         language: this.language,
         type: packet.type,
         parameters: packet.parameters,
       },
-    );
+    });
     this.log('Incoming: ', msg);
     if (packet.source_name != this.client.username) {
       routing.route(msg);

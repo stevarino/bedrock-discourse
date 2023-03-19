@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
-const config = require('../src/config');
+const config = require('../src/config').get();
 
 const commands = [
   new SlashCommandBuilder().setName('allow').setDescription('Manage allowlist for a given server (add/remove users)'),

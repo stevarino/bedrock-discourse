@@ -4,8 +4,9 @@ const common = require('./src/common');
 const database = require('./src/database');
 const prom = require('./src/prom');
 const { formatMail } = require('./src/routing');
+const actions = require('./src/actions');
 
-async function getTestDatabase(testContext) {
+async function getDatabase(testContext) {
   const db = new database.DatabaseWrapper({
     path: ':memory:',
   });
@@ -14,15 +15,27 @@ async function getTestDatabase(testContext) {
   return db;
 }
 
+function getMessage(opts = null) {
+  let options = {
+    source: 'test',
+    type: common.MessageType.Test,
+    from: 'test',
+    fromFriendly: 'test',
+    message: ''
+  };
+  Object.assign(options, opts || {})
+  return new common.Message(options)
+}
+
 test.serial('Database create player/server', async (t) => {
-  const db = await getTestDatabase(t);
+  const db = await getDatabase(t);
   await db.checkInPlayers('test', { a: 'foo', b: 'bar' });
   t.is(await db.Player.count(), 2, 'Incorrect player count (2 expected)');
   t.is(await db.Server.count(), 1, 'Incorrect server count (1 expected)');
 });
 
 test.serial('Database send player message', async (t) => {
-  const db = await getTestDatabase(t);
+  const db = await getDatabase(t);
   await db.checkInPlayers('test', { testXboxId: 'foo', testXboxId2: 'bar' });
 
   // send two messages
@@ -43,9 +56,10 @@ test.serial('Database send player message', async (t) => {
 });
 
 test.serial('Database send server announcement', async (t) => {
-  const db = await getTestDatabase(t);
-  const _msg = (server, from, message) => new common.Message(
-    '', '', from, from, message, { server: server });
+  const db = await getDatabase(t);
+  const _msg = (server, from, message) => getMessage({
+    from: from, fromFriendly: from, message: message, context: { server: server }
+  });
   await db.checkInPlayers('test', { testXboxId: 'foo' });
   await db.sendServerMessage(_msg('test', 'foo', 'first'));
 
@@ -75,7 +89,7 @@ test.serial('Database send server announcement', async (t) => {
 });
 
 test.serial('Database discord link', async (t) => {
-  const db = await getTestDatabase(t);
+  const db = await getDatabase(t);
   await db.checkInPlayers('test', { testXboxId: 'foo' });
   const code = await db.initDiscordLink('testXboxId');
   const result = await db.finalizeDiscordLink(code, 'bar');
@@ -86,7 +100,7 @@ test.serial('Database discord link', async (t) => {
 
 test.serial('Database Counter Increment', async (t) => {
   t.teardown(prom.reset);
-  const db = await getTestDatabase(t);
+  const db = await getDatabase(t);
   const cntr = new prom.Counter({
     name: 'test', help: 'help', labelNames: ['foo', 'bar'] });
   const fields = { 'foo': 'a', 'bar': 'b' };
@@ -103,7 +117,7 @@ test.serial('Database Counter Increment', async (t) => {
 
 test.serial('Database Counter Reload', async (t) => {
   t.teardown(prom.reset);
-  const db = await getTestDatabase(t);
+  const db = await getDatabase(t);
   const setup = { name: 'test', help: 'help', labelNames: ['foo', 'bar'] };
   const config = { web: { enabled: false, counterDelay: 0 } };
   const fields = { 'foo': 'a', 'bar': 'b' };
@@ -145,4 +159,95 @@ test.serial('Format Mail', t => {
   t.is(formatMail('a **b\nc d**', { headline: true }), 'b\nc d');
   // headline with unmatched closing tag
   t.is(formatMail('a **b\nc d', { headline: true }), 'b\nc d');
+});
+
+test('Action isPrivileged', t => {
+  let testActions = actions.init({
+    groups: { 'test_group': [ 'test' ] }
+  });
+  for (const action of testActions) {
+    if (action.name == 'say') {
+      action.isSilent = true;
+      t.true(action.isAuthorized(getMessage( {
+        context: { player: { xboxId: 'test' } }
+      } )));
+      t.false(action.isAuthorized(getMessage( {
+        context: { player: { xboxId: 'notTest' } },
+      } )));
+    }
+  }
+})
+
+test('Command Init', t => {
+  let testActions = actions.init({
+    commands: {
+      foo: { format: '', command: '', }
+    }
+  });
+  for (const action of testActions) {
+    if (action.name == 'foo') {
+      t.pass();
+      return;
+    }
+  }
+  t.fail();
+})
+
+test('Command Basic', async t => {
+  let cmd = new actions.Command({
+    name: 'test',
+    format: '',
+    command: 'echo $((1+1))',
+    isSilent: true,
+  });
+  let msg = getMessage();
+  await cmd.action(msg, '');
+  t.is(msg.context.command.stdout.trim(), '2');
+});
+
+test('Command Named Parameters', async t => {
+  let cmd = new actions.Command({
+    name: 'test',
+    format: '(?<foo>\\d+)',
+    command: 'echo $((1+{foo}))',
+    isSilent: true,
+  });
+  let msg = getMessage();
+  await cmd.action(msg, '1');
+  t.is(msg.context.command.stdout.trim(), '2');
+  msg = getMessage();
+  await cmd.action(msg, '2');
+  t.is(msg.context.command.stdout.trim(), '3');
+});
+
+test('Command Indexed Parameters', async t => {
+  let cmd = new actions.Command({
+    name: 'test',
+    format: '(\\d+)',
+    command: 'echo $((1+{1}))',
+    isSilent: true,
+  });
+  let msg = getMessage();
+  await cmd.action(msg, '1');
+  t.is(msg.context.command.stdout.trim(), '2');
+  msg = getMessage();
+  await cmd.action(msg, '2');
+  t.is(msg.context.command.stdout.trim(), '3');
+});
+
+test('Command ACL', async t => {
+  let cmd = new actions.Command({
+    name: 'test',
+    format: '',
+    command: 'echo $((1+1))',
+    isSilent: true,
+    groups: [ 'test_group' ],
+    config: { groups: { 'test_group': [ 'test' ] } }
+  });
+  t.true(cmd.isAuthorized(getMessage( {
+    context: { player: { xboxId: 'test' } }
+  } )));
+  t.false(cmd.isAuthorized(getMessage( {
+    context: { player: { xboxId: 'notTest' } },
+  } )));
 });

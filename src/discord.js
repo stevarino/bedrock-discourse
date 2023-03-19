@@ -1,7 +1,7 @@
 const Discord = require('discord.js');
 
 const actions = require('./actions');
-const config = require('./config');
+const config = require('./config').get();
 const common = require('./common');
 const routing = require('./routing');
 
@@ -12,7 +12,7 @@ const channelUrl = new RegExp('^https://discord\\.com/channels/([0-9]+)/([0-9]+)
 
 /**
  * Initialize discord client, if configured.
- * @returns null
+ * @returns {null}
  */
 function init() {
   if (config.discord === undefined) {
@@ -105,20 +105,25 @@ function init() {
     }
     // https://discord.js.org/#/docs/discord.js/stable/typedef/TextBasedChannelTypes
     if (message.channel.type == 'DM') {
-      actions.parseMessage(new common.Message(
-        null, common.MessageType.DiscordDM, message.author.id,
-        `${message.author.username}#${message.author.discriminator}`,
-        message.content,
-      ));
+      actions.parseMessage(new common.Message({
+        source: null,
+        type: common.MessageType.DiscordDM,
+        from: message.author.id,
+        fromFriendly: `${message.author.username}#${message.author.discriminator}`,
+        message: message.content,
+    }));
       return;
     }
     const author = await message.guild.members.fetch(message.author);
     const user_id = `${author.user.username}#${author.user.discriminator}`;
     const channel = channelsById[message.channelId].name;
-    routing.route(new common.Message(
-      channel, common.MessageType.DiscordChat, author.id,
-      author.nickname ?? user_id, message.content,
-    ));
+    routing.route(new common.Message({
+      source: channel,
+      type: common.MessageType.DiscordChat,
+      from: author.id,
+      fromFriendly: author.nickname ?? user_id,
+      message: message.content,
+    }));
   });
 
   client.login(config.discord.token);

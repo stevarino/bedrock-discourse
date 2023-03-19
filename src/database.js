@@ -551,7 +551,7 @@ function instance() {
 }
 
 async function init() {
-  const config = require('./config');
+  const config = require('./config').get();
   db = new DatabaseWrapper(config.database);
   await db.sync();
   const [ version ] = await db.Setting.findOrCreate({

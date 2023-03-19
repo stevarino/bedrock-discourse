@@ -8,10 +8,11 @@ properties:
     additionalProperties: false
     required: [servers]
     properties:
-      profilesFolder:
-        type: string
-      connectTimeout:
-        type: number
+      # directory for Minecraft auth tokens. Optional.
+      # Useful for manually clearing the auth cache.
+      profilesFolder: {type: string}
+      # (optional) how many milliseconds before timing out.
+      connectTimeout: {type: number}
       servers:
         type: object
         patternProperties:
@@ -22,34 +23,42 @@ properties:
             properties:
               host: {type: string}
               port: {type: number}
-              format: {type: string}
+              # commands to be run on startup
               commands:
                 type: array
                 items: {type: string}
+              # Prismarine createClient options
               options: {type: object}
+              # message routing settings
               routing:
                 type: object
                 patternProperties:
+                  # named target, discord or (in theory) other minecraft
                   '':
                     type: object
                     additionalProperties: false
                     properties:
+                      # relay, log, or mail
+                      # relay = just chat messages between players, two way comms
+                      # log = all events, relayed, one way (from minecraft)
+                      # mail = input sends in-game email, one way (from target)
                       type:
                         type: string
                         enum: [relay, log, mail]
                         default: relay
-                      headline:
-                        type: bool
-                        default: false
-                      minLength:
-                        type: number
-                        default: 20
+                      # if mail, only include bold content
+                      headline: {type: bool, default: false}
+                      # if mail, filter by minimum length
+                      minLength: {type: number, default: 20}
+              # acl list for priveleged commands
               groups:
                 type: array
                 items: {type: string}
+              # (wip) default language
               language:
                 type: string
                 enum: [eng]
+  # http server, for prometheus logging (but can be easily parsed by other clients)
   web:
     type: object
     properties:
@@ -59,6 +68,11 @@ properties:
       counterDelay: {type: number}
     required: [host, port]
     additionalProperties: false
+
+  # Discord Settings
+  # Defines connection settings for discord channels.
+  #
+  # Most configuration for discord is set in the minecraft.servers.*.routing settings.
   discord:
     type: object
     required: [token, app_id, channels]
@@ -78,15 +92,28 @@ properties:
                 type: string
                 pattern: '^https://discord\.com/channels/[0-9]+/[0-9]+$'
               nick: {type: string}
-              format: {type: string}
             oneOf:
               - required: [guild, channel]
               - required: [url]
             additionalProperties: false
+      # default nick to be used
       nick: {type: string}
+      # acl list for priveleged commands
       groups:
         type: array
         items: {type: string}
+  
+  # ACL groups
+  #
+  # An action is authorized by default if not priveleged.
+  # If it is priveleged, it is authorized if (and only if):
+  #   - (the action does not specify groups OR the user is in at least one group)
+  #   - AND (the server/channel does not specify groups OR the user is in at least one group)
+  #   - AND (the user is in at least one group)
+  #
+  # The last case is to catch the case if groups are not attached to neither
+  # the channel/server nor the action. This allows easy authorization by simply
+  # creating a default group.
   groups:
     type: object
     patternProperties:
@@ -94,7 +121,9 @@ properties:
         type: array
         items:
           type: string
+          # expects xbox id's
           pattern: "\\d+"
+  # sqlite settings, used for player persistance.
   database:
     type: object
     additionalProperties: false
@@ -106,3 +135,38 @@ properties:
         items:
           type: string
           pattern: "^\\d+$"
+  # run command line programs via the agent (discord or minecraft)
+  commands:
+    type: object
+    additionalProperties: false
+    patternProperties:
+      '':
+        type: object
+        additionalProperties: false
+        required: [format, command]
+        properties:
+          # regular expression to match, can use both named and unnamed subpatterns
+          # example: "(?<message>.*)"
+          format: {type: string}
+          # command, can use simple format operations
+          # example: "echo {message}"
+          command: {type: string}
+          # if format should match the full string 
+          fullStringMatch: {type: bool, default: true}
+          # if command requests should be logged
+          isSilent: {type: bool, default: false}
+          # if user should be "known" (in any group)
+          isPriveleged: {type: bool, default: true}
+          # allowable from Minecraft
+          allowMinecraft: {type: bool, default: false}
+          # allowable from Discord
+          allowDiscord: {type: bool, default: false}
+          # allow from any medium, overrides the previous settings
+          # note: command line programs don't make much sense to limit
+          # as they are not tied to any particular medium/channel/server
+          # unless explicitly specified.
+          allowAll: {type: bool, default: true}
+          # list of group names, user must belong to at least one referenced group
+          groups:
+            type: array
+            items: {type: string}

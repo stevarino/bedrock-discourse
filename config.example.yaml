@@ -4,7 +4,7 @@ minecraft:
   connectTimeout: 10000
   # optional profile directory (see bedrock-protocol docs)
   profilesFolder: "C:\\projects\\pocket_prattle\\profiles"
-  servvers:
+  servers:
     # under minecraft.servers, define servers using short names
     survival:
       # connection details, required

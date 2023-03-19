@@ -18,14 +18,23 @@ const MessageType = {
   EventPlayerHasMail: 'EventPlayerHasMail',
   EventServerSendMail: 'EventServerSendMail',
   EventPlayerList: 'EventPlayerList',
+  Test: 'Test',
 };
 
 class Message {
-  constructor(source, type, from, fromFriendly, message, context) {
+  /**
+   * @param {string} source Message source (discord channel, minecraft server)
+   * @param {string} type MessageType value
+   * @param {string} from Identifier of sender
+   * @param {string} [fromFriendly] Sender identifier intended for output
+   * @param {string} message Message
+   * @param {object} context Optional ambiguous context
+   */
+  constructor({source, type, from, fromFriendly=null, message, context=null} = {}) {
     this.source = source;
     this.type = type;
     this.from = from;
-    this.fromFriendly = fromFriendly;
+    this.fromFriendly = fromFriendly || from;
     this.message = message;
     this.context = context ?? {};
   }
@@ -33,7 +42,7 @@ class Message {
   /**
    * Returns the xboxId, if available.
    *
-   * @returns string
+   * @returns {string}
    */
   getXBoxId() {
     return this.getPlayer()?.xboxId;
@@ -42,7 +51,7 @@ class Message {
   /**
    * Returns the player object of the message, if available.
    *
-   * @returns Player
+   * @returns {Player}
    */
   getPlayer() {
     const isDiscord = this.isDiscord();
@@ -55,14 +64,14 @@ class Message {
         return player;
       }
     }
-    return undefined;
+    return this.context.player;
   }
 
   /**
    * Respond to the message.
    *
    * @param {str} response
-   * @returns null;
+   * @returns {null}
    */
   reply(response) {
     switch (this.type) {
@@ -70,6 +79,8 @@ class Message {
       return messenger.emit(MessageType.MinecraftWhisper, this.from, response);
     case MessageType.DiscordDM:
       return messenger.emit(MessageType.DiscordDM, this.from, response);
+    case MessageType.Test:
+      this.context.response = response;
     }
   }
 
@@ -88,6 +99,14 @@ class Message {
         this.isMinecraft() ? 'minecraft' : 'discord', templates);
     }
     this.reply(template(this.context.language, templates, values));
+  }
+
+  /**
+   * Reply to a message with an error response.
+   * @param {string} response
+   */
+  error(response) {
+    this.template('error', response);
   }
 
   isDiscord() {
@@ -142,7 +161,7 @@ let templateCache = {};
  * @param {string} language Language to use ('en')
  * @param {array[string]} templateNames Names of templates to use
  * @param {object} replacements Fields to replace objects with
- * @returns string
+ * @returns {string}
  */
 function template(language, templateNames, replacements = {}) {
   language = language || 'en';
@@ -199,7 +218,7 @@ function getPlatformTemplates(platform, templates) {
  * @param {string} formatString a string of the format "hello, {subject}!"
  * @param {object} replacements an object to be formatted {subject: "world"}
  * @param {object} cache language specific template cache
- * @returns string
+ * @returns {string}
  */
 function format(formatString, replacements, cache) {
   if (formatString === undefined) {
@@ -251,7 +270,7 @@ function emit(...args) {
  * Capitalizes first character.
  *
  * @param {string} str string to capitalize
- * @returns The input string with the first character capitalized.
+ * @returns {string} The input string with the first character capitalized.
  */
 function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1);

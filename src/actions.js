@@ -1,52 +1,140 @@
 const common = require('./common');
-const config = require('./config');
 const database = require('./database');
-
-const SUPERGROUP = [];
+const util = require('node:util');
+const configLib = require('./config');
+const exec = util.promisify(require('node:child_process').exec);
 
 class Action {
-  constructor({ name, action, isPriveleged = false, allowDiscord = false, allowMinecraft = false, allowAll = false } = {}) {
+  constructor({ name, action, isPriveliged = null, allowDiscord = false,
+                allowMinecraft = false, allowAll = false, groups = null,
+                config = null, isSilent = false } = {}) {
     this.name = name;
     this.action = action;
-    this.priveleged = isPriveleged;
+    this.priveliged = isPriveliged == null ? Boolean(groups) : isPriveliged;
     this.allowDiscord = allowDiscord || allowAll;
     this.allowMinecraft = allowMinecraft || allowAll || !allowDiscord;
+    this.groups = groups;
+    this.isSilent = isSilent;
+    this.config = config
   }
 
   /**
    * Checks if user is authorized to run command.
    *
-   * @param {common.Message} message Message to check
+   * @param {common.Message} msg Message to check
    * @param {string} destination Optional destination (minecraft or discord id)
+   * @param {Action} action Optional action being
    * @returns {bool}
    */
-  isAuthorized(message, destination) {
-    const _func = () => {
-      if (!this.isPriveleged) return true;
-      const key = message.getXBoxId();
-      if (!key) return false;
-      if (destination && destination.groups) {
-        for (const g in destination.groups) {
-          if (config.groups[g].includes(key)) {
-            return true;
-          }
-        }
-      } else {
-        return SUPERGROUP.includes(key);
-      }
-      return false;
-    };
-    if (_func()) {
+  isAuthorized(msg, destination) {
+    let [authorized, reason] = this._authCheck(msg, destination);
+    if (authorized) {
       return true;
     }
-    log('Unauthorized:', destination, message);
+    this._log(msg, 'Unauthorized:', reason);
     return false;
+  }
+
+  /**
+   * @param {common.Message} msg
+   * @param {string} destination
+   * @typedef {[bool, string]} AccessWithReason
+   * @returns {AccessWithReason} authorizeded, reason
+   */
+  _authCheck(msg, destination) {
+    if (!this.priveliged) return true;
+    const key = msg.getXBoxId();
+    if (!key) return false;
+    // IFF action acl (if set)
+    // AND channel acl (if set)
+    // AND user defined (will always be true if prev true).
+    if (this.groups) {
+      if (!this._checkGroups(key, this.groups)) {
+        return [false, `${key} not in Action ${this.name} ACL (${JSON.stringify(this.groups)})`];
+      }
+    }
+    let groups = {
+      ...(this.config.minecraft?.servers || {}),
+      ...(this.config.discord || {}),
+    }[destination]?.groups
+    if (groups) {
+      if (!this._checkGroups(key, groups)) {
+        return [false, `${key} not in ${destination} ACL (${JSON.stringify(this.groups)})`];
+      }
+    }
+    const allUsers = Object.values(this.config.groups || {}).flat();
+    return [allUsers.includes(key), `${key} not defined in any groups.`];
+  }
+
+  /**
+   * Checks if a key exists in a list of groups.
+   *
+   * @param {string} key
+   * @param {array[string]} groups
+   * @returns {bool}
+   */
+  _checkGroups(key, groups) {
+    for (const g of groups) {
+      if (this.config.groups[g].includes(key)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Performs a detailed log entry with metadata.
+   *
+   * @param {common.Message} msg Originating message.
+   * @param  {...any} args Other logs to be logged.
+   */
+  _log(msg, ...args) {
+    if (this.isSilent) return;
+    log(`[${this.name} by ${msg.from} (${msg.fromFriendly})]`, ...args)
   }
 }
 
-Object.values(config.groups || {}).forEach(members => {
-  members.forEach(member => SUPERGROUP.push(member));
-});
+class Command extends Action {
+  constructor({ name, format, command, isPriveliged = true, allowDiscord = false,
+                allowMinecraft = false, allowAll = true, groups = null,
+                config = null, fullStringMatch = false, isSilent = false } = {}) {
+    let re = new RegExp(fullStringMatch ? `^${format}$`: format);
+    /**
+     * Command action.
+     *
+     * @param {common.Message} msg
+     * @param {string} rest
+     * @returns {null}
+     */
+    let action = async function(msg, rest) {
+      let match = re.exec(rest);
+      if (match === null) {
+        this._log(msg, `Format error: '${rest}' does not match ${format}`)
+        msg.error(`${this.name}: Format error.`);
+      }
+      let args = Object.assign({}, match.groups || {});
+      for (let i=0; i<match.length; i++) {
+        args[`${i}`] = match[i];
+      }
+      let cmd = common.format(command, args);
+      this._log(msg, `Executing: ${cmd}`);
+      let stdout, stderr;
+      try {
+        ({ stdout, stderr } = await exec(cmd));
+      } catch (err) {
+        this._log(msg, `error: ${JSON.stringify(err)}`);
+        msg.error('Error during execution. See log for details.');
+        return;
+      }
+      this._log(msg, `stdout: ${stdout}`);
+      this._log(msg, `stderr: ${stderr}`);
+      msg.context.command = { stdout, stderr };
+      msg.reply(`Success${stdout?.trim() ? `:  ${stdout}` : ''}`);
+    }
+    super({name, action, isPriveliged, config, allowDiscord, allowMinecraft, allowAll, isSilent, groups });
+    return this;
+  }
+}
 
 function wordPop(str) {
   const firstWordPtn = /^\s*([^\s]+)\s*(.*)$/;
@@ -55,13 +143,13 @@ function wordPop(str) {
 }
 
 /**
- * Attempt to read a command
+ * Attempt to perform a requested action
  *
  * @param {common.Message} message
  */
 function parseMessage(message) {
   const [command, rest] = wordPop(message.message);
-  for (const action of actions) {
+  for (const action of ACTIONS) {
     if (action.name == command) {
       if (!action.isAuthorized(message)) continue;
       if (!action.allowDiscord && message.isDiscord()) continue;
@@ -77,19 +165,19 @@ function parseMessage(message) {
 }
 
 const [
-  isPriveleged,
+  isPriveliged,
   allowDiscord, // eslint-disable-line no-unused-vars
   allowMinecraft,
   allowAll,
 ] = Array(4).fill(true);
 
-const actions = [
-  new Action({ name: 'ping', allowAll, action: (msg) => msg.reply('pong') }),
+const _actions = [
+  { name: 'ping', allowAll, action: (msg) => msg.reply('pong') },
 
-  new Action({ name: 'help', allowAll,
+  { name: 'help', allowAll,
     action: function(msg) {
       const reply = ['Available commands:'];
-      actions.forEach(action => {
+      ACTIONS.forEach(action => {
         if (!action.isAuthorized(msg)) return;
         if (!action.allowDiscord && msg.isDiscord()) return;
         if (!action.allowMinecraft && msg.isMinecraft) return;
@@ -98,9 +186,9 @@ const actions = [
       });
       msg.reply(reply.join('\n'));
     },
-  }),
+  },
 
-  new Action({ name: 'say', isPriveleged, allowAll,
+  { name: 'say', isPriveliged, allowAll,
     action: function(msg, rest) {
       const [channel, relayedMessage] = wordPop(rest);
       const filteredSend = (msgType) => {
@@ -114,9 +202,9 @@ const actions = [
       Object.entries(config.minecraft.servers).forEach(filteredSend(common.MessageType.MinecraftChat));
       Object.entries(config.discord.channels).forEach(filteredSend(common.MessageType.DiscordChat));
     },
-  }),
+  },
 
-  new Action({ name: 'read', allowMinecraft,
+  { name: 'read', allowMinecraft,
     action: async function(msg) {
       // TODO: checking from discord
       // TODO: "read all"
@@ -134,17 +222,17 @@ const actions = [
         message: mail.message,
       });
     },
-  }),
+  },
 
-  new Action({ name: 'account', allowAll,
+  { name: 'account', allowAll,
     action: async function(msg) {
       const player = msg.getPlayer();
       if (player === undefined) return msg.template('error');
       return msg.reply(JSON.stringify(player, null, 2));
     },
-  }),
+  },
 
-  new Action({ name: 'check', allowMinecraft,
+  { name: 'check', allowMinecraft,
     action: async function(msg) {
       const messageCount = await database.instance().countPlayerMessages(msg.source, msg.from);
       let templates = ['inbox'];
@@ -153,9 +241,9 @@ const actions = [
       templates = common.getPlatformTemplates('minecraft', templates);
       msg.template(templates, { messageCount });
     },
-  }),
+  },
 
-  new Action({ name: 'send', allowMinecraft,
+  { name: 'send', allowMinecraft,
     action: async function(msg, rest) {
       const [name, mail] = wordPop(rest);
       const xboxId = await database.instance().playerNameToXBoxId(name);
@@ -165,18 +253,18 @@ const actions = [
       await database.instance().sendPlayerMessage(msg.from, xboxId, mail);
       msg.template('mail_sent');
     },
-  }),
+  },
 
-  new Action({ name: 'nick', allowMinecraft,
+  { name: 'nick', allowMinecraft,
     action: async function(msg, rest) {
       if (await database.instance().registerNick(msg.from, rest)) {
         return msg.template('success');
       }
       msg.template('error');
     },
-  }),
+  },
 
-  new Action({ name: 'set_nick', isPriveleged,
+  { name: 'set_nick', isPriveliged,
     action: async function(msg, rest) {
       const player = wordPop(rest);
       if (await database.instance().registerNick(player, rest)) {
@@ -184,9 +272,9 @@ const actions = [
       }
       msg.template('error');
     },
-  }),
+  },
 
-  new Action({ name: 'link', allowAll,
+  { name: 'link', allowAll,
     action: async function(msg, rest) {
       if (msg.type == common.MessageType.MinecraftWhisper) {
         if (rest.trim() == '') {
@@ -201,9 +289,9 @@ const actions = [
       }
       msg.template('error');
     },
-  }),
+  },
 
-  new Action({ name: 'list_players', allowAll, isPriveleged,
+  { name: 'list_players', allowAll, isPriveliged,
     action: async function(msg, rest) {
       const players = database.instance().getPlayers();
       if (msg.isMinecraft()) {
@@ -222,12 +310,51 @@ const actions = [
       }
       msg.template('error');
     },
-  }),
+  },
+  { name: 'reload_config', allowAll, isPriveliged,
+    action: async function(msg) {
+      let config = configLib.processConfig();
+      if (config.groups) {
+        configLib.get().groups = config.groups;
+      }
+      if (config.commands) {
+        configLib.get().commands = config.commands;
+      }
+      init();
+      msg.reply('OK.')
+    }
+  }
 ];
+
+const ACTIONS = [];
+
+function init(config = null) {
+  if (!config) {
+    config = configLib.get();
+  }
+  let actions = [];
+  ACTIONS.length = 0;
+  let names = new Set();
+  _actions.forEach(a => {
+    let action = Object.assign({}, a, { config });
+    names.add(a.name);
+    actions.push(new Action(action));
+  });
+  Object.entries(config.commands || {}).forEach(([name, cmd]) => {
+    if (name in names) {
+      throw new Error(`Command ${name} already defined`);
+    }
+    let action = Object.assign({}, cmd, {name, config});
+    names.add(name);
+    actions.push(new Command(action));
+  });
+  ACTIONS.push(...actions);
+  return actions;
+}
 
 
 function log(...args) {
-  common.log('actions: ', ...args);
+  common.log('actions', ...args);
 }
 
-module.exports = { parseMessage };
+module.exports = { init, parseMessage, Action, Command };
