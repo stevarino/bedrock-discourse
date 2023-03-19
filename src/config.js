@@ -26,6 +26,12 @@ function processConfig() {
   return config;
 }
 
+/**
+ * Validates a config, returning a list of errors.
+ *
+ * @param {object} config 
+ * @returns {array[string]}
+ */
 function validateConfig(config) {
   /** @type {Set}| */
   const names = new Set();
@@ -40,4 +46,4 @@ function validateConfig(config) {
   return errors.concat(result.errors.map(e => e.stack));
 }
 
-module.exports = { processConfig, get };
+module.exports = { processConfig, get, validateConfig };

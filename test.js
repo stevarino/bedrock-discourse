@@ -235,7 +235,7 @@ test('Command Indexed Parameters', async t => {
   t.is(msg.context.command.stdout.trim(), '3');
 });
 
-test('Command ACL', async t => {
+test('Command ACL', t => {
   let cmd = new actions.Command({
     name: 'test',
     format: '',
@@ -250,4 +250,14 @@ test('Command ACL', async t => {
   t.false(cmd.isAuthorized(getMessage( {
     context: { player: { xboxId: 'notTest' } },
   } )));
+});
+
+test('Config Example Valid', async t => {
+  const configLib = require('./src/config');
+  const util = require('node:util');
+  const fs = require('fs');
+  const readFile = util.promisify(fs.readFile);
+  const yaml = require('yaml');
+  const example = yaml.parse(await readFile('./config.example.yaml', 'utf8'));
+  t.deepEqual(configLib.validateConfig(example), []);
 });

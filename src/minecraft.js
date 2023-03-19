@@ -33,14 +33,16 @@ class Agent {
    * A Minecraft agent, relaying chat messages and obsserving state for a
    * particular server. Not a bot, not really a client itself, its an agent!
    * @param {string} name
-   * @param {{ host: string, port: number, relay: object?, commands: array<string>? format: string? }} options
+   * @param {{ host: string, port: number, relay: object?,
+   *           commands: array<string>? format: string?,
+   *           displayName: string? }} options
    */
   constructor(name, options) {
     this.db = database.instance();
     this.name = name;
     this.ticks = [];
     this.reconnectTimer = null;
-    this.tick_count = 100;
+    this.tickCount = 100;
     this.players = {};
     this.commands = [];
     this.relay = {};
@@ -48,8 +50,10 @@ class Agent {
     this.authenticated = null;
     this.authResolve = null;
     this.authReject = null;
-    this.language = 'en';
     this.timers = new Set();
+    // set option defaults
+    this.language = 'en';
+    this.displayName = name;
     Object.assign(this, options);
 
     common.messenger.on(common.MessageType.MinecraftRelay, (channel, message) => {
@@ -214,11 +218,11 @@ class Agent {
     const now = [new Date().getTime(), packet];
     this.ticks.unshift(now);
     let cnt = this.ticks.length;
-    if (cnt > this.tick_count) {
+    if (cnt > this.tickCount) {
       this.ticks.pop();
-      cnt = this.tick_count;
+      cnt = this.tickCount;
     }
-    if (cnt < this.tick_count / 2) return;
+    if (cnt < this.tickCount / 2) return;
     // 50 ms per tick = 20 ticks per second
     // heartbeat is every 10 ticks, or 500ms
     const then = this.ticks[cnt - 1];

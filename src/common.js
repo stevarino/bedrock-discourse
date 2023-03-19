@@ -249,6 +249,23 @@ function format(formatString, replacements, cache) {
     });
 }
 
+/**
+ * Return a specific channel/server given a name.
+ *
+ * @param {string} name 
+ * @param {object} config 
+ * @returns {object?}
+ */
+function getSource(name, config) {
+  for (const server in config.minecraft.servers) {
+    if (name == server) return config.minecraft.servers[server];
+  }
+  for (const channel in config.discord.channels) {
+    if (name == channel) return config.discord.channels[channel];
+  }
+  return null;
+}
+
 let LOG_SOURCE_LENGTH = 0;
 
 /**
@@ -286,5 +303,5 @@ messenger.on(MessageType.EventPlayerList, (players) => {
 
 module.exports = {
   format, messenger, log, Message, MessageType, template, emit, capitalize,
-  getPlatformTemplates, Player, playerCache,
+  getPlatformTemplates, Player, playerCache, getSource
 };

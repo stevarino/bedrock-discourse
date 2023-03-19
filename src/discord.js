@@ -31,6 +31,7 @@ function init() {
 
   Object.entries(config.discord.channels).forEach(([name, channel]) => {
     channel.name = name;
+    channel.displayName = channel.displayName || name;
     if (channel.url !== undefined) {
       const result = channelUrl.exec(channel.url);
       if (result === null) throw new Error(`Unrecognized URL: ${channel.url}`);

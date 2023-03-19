@@ -15,6 +15,11 @@ properties:
       connectTimeout: {type: number}
       servers:
         type: object
+        # Fields under minecraft.servers are individual servers to connect to
+        # with the key being used as an identifier and primary key.
+        #
+        # Changing the key may result in loss of state in the database. If
+        # renaming is needed/desired, use the name field.
         patternProperties:
           '':
             type: object
@@ -27,6 +32,8 @@ properties:
               commands:
                 type: array
                 items: {type: string}
+              # optional name for display, uses the key otherwise
+              displayName: {type: string}
               # Prismarine createClient options
               options: {type: object}
               # message routing settings
@@ -57,7 +64,7 @@ properties:
               # (wip) default language
               language:
                 type: string
-                enum: [eng]
+                enum: [en]
   # http server, for prometheus logging (but can be easily parsed by other clients)
   web:
     type: object
@@ -92,6 +99,7 @@ properties:
                 type: string
                 pattern: '^https://discord\.com/channels/[0-9]+/[0-9]+$'
               nick: {type: string}
+              displayName: {type: string}
             oneOf:
               - required: [guild, channel]
               - required: [url]

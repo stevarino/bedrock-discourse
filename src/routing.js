@@ -1,4 +1,5 @@
 const common = require('./common');
+const configLib = require('./config');
 
 let relay_id = 0;
 
@@ -114,11 +115,6 @@ function generateNetworks(config) {
       }
     });
   });
-  console.log(JSON.stringify(
-    networks,
-    (k, v) => (v instanceof Set ? [...v] : v),
-    2,
-  ));
   return [networks, mailers];
 }
 
@@ -134,21 +130,29 @@ function route(message, networks, mailers) {
   if (message.getPlayer()?.nickname) {
     message.fromFriendly = message.getPlayer().nickname;
   }
+  // copy message for editing
+  let msg = Object.assign({}, message);
+  // check for displayName
+  let displayName = common.getSource(messsage.source, configLib.get())?.displayName;
+  if (displayName) msg.source = displayName;
   // RELAYS
   Object.entries(networks[message.source]?.relay ?? {}).forEach(([dest, options]) => {
+    // avoid echoes
     if (dest == message.source) return;
+    // only chat messages
     if (!['MinecraftChat', 'DiscordChat'].includes(message.type)) return;
     common.emit(
       common.capitalize(options.platform) + 'Relay', dest,
-      common.template('', common.getPlatformTemplates(options.platform, 'relay'), message),
+      common.template('', common.getPlatformTemplates(options.platform, 'relay'), msg),
     );
   });
   // LOGS
   Object.entries(networks[message.source]?.log ?? {}).forEach(([dest, options]) => {
     if (dest == message.source) return;
+    if (displayName) msg.source = displayName;
     common.emit(
       common.capitalize(options.platform) + 'Chat', dest,
-      common.template('', common.getPlatformTemplates(options.platform, 'log'), message),
+      common.template('', common.getPlatformTemplates(options.platform, 'log'), msg),
     );
   });
   // MAILERS
@@ -160,7 +164,7 @@ function route(message, networks, mailers) {
         common.MessageType.EventServerSendMail,
         // NOTE: only use fromFriendly as discord id's are useless.
         new common.Message({
-          source: message.source,
+          source: msg.source,
           type: common.MessageType.EventServerSendMail,
           from: message.fromFriendly,
           fromFriendly: message.fromFriendly,
@@ -173,7 +177,7 @@ function route(message, networks, mailers) {
 }
 
 function init() {
-  const config = require('./config').get();
+  const config = configLib.get();
   const [networks, mailers] = generateNetworks(config);
   Object.assign(NETWORKS, networks);
   Object.assign(MAILERS, mailers);
