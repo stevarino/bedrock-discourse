@@ -5,8 +5,10 @@ const { validate } = require('jsonschema');
 
 const CONFIG = {};
 
+const ENDPOINT_CACHE = {};
+
 function get() {
-  if (CONFIG) return CONFIG;
+  if (Object.keys(CONFIG).length) return CONFIG;
   return Object.assign(CONFIG, processConfig());
 }
 
@@ -23,7 +25,7 @@ function processConfig() {
     console.error('Invalid config file:', errors);
     process.exit(1);
   }
-  return config;
+  return normalizeConfig(config);
 }
 
 /**
@@ -46,4 +48,29 @@ function validateConfig(config) {
   return errors.concat(result.errors.map(e => e.stack));
 }
 
-module.exports = { processConfig, get, validateConfig };
+function normalizeConfig(config) {
+  Object.keys(ENDPOINT_CACHE).forEach(key => {
+    delete ENDPOINT_CACHE[key];
+  });
+  Object.entries(config.minecraft.servers).forEach(([name, server]) => {
+    ENDPOINT_CACHE[name] = server;
+    server.name = name;
+    server.endpointType = 'minecraft';
+  });
+  Object.entries(config.discord?.channels ?? {}).forEach(([name, channel]) => {
+    ENDPOINT_CACHE[name] = channel;
+    channel.name = name;
+    channel.endpointType = 'discord';
+  })
+  return config;
+}
+
+function findEndpoint(name) {
+  return ENDPOINT_CACHE[name];
+}
+
+function getEndpoints() {
+  return Object.values(ENDPOINT_CACHE);
+}
+
+module.exports = { processConfig, get, validateConfig, findEndpoint, getEndpoints, normalizeConfig };

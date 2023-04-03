@@ -53,10 +53,7 @@ class Action {
         return [false, `${key} not in Action ${this.name} ACL (${JSON.stringify(this.groups)})`];
       }
     }
-    let groups = {
-      ...(this.config.minecraft?.servers || {}),
-      ...(this.config.discord || {}),
-    }[destination]?.groups
+    let groups = configLib.getEndpoints()[destination]?.groups;
     if (groups) {
       if (!this._checkGroups(key, groups)) {
         return [false, `${key} not in ${destination} ACL (${JSON.stringify(this.groups)})`];

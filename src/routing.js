@@ -133,7 +133,7 @@ function route(message, networks, mailers) {
   // copy message for editing
   let msg = Object.assign({}, message);
   // check for displayName
-  let displayName = common.getSource(messsage.source, configLib.get())?.displayName;
+  let displayName = configLib.findEndpoint(messsage.source)?.displayName;
   if (displayName) msg.source = displayName;
   // RELAYS
   Object.entries(networks[message.source]?.relay ?? {}).forEach(([dest, options]) => {
